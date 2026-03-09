@@ -187,9 +187,7 @@ mod tests {
         let mut my_sec = SecureBytes::from("hello");
         my_sec.zero_out();
         // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-        unsafe {
-            my_sec.content.set_len(5)
-        }
+        unsafe { my_sec.content.set_len(5) }
         assert_eq!(my_sec.unsecure(), b"\x00\x00\x00\x00\x00");
     }
 
@@ -236,9 +234,7 @@ mod tests {
         let mut mbstring = mbstring1.clone();
         mbstring.zero_out();
         // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-        unsafe {
-            mbstring.content.set_len(8)
-        }
+        unsafe { mbstring.content.set_len(8) }
         assert_eq!(mbstring.unsecure(), &['\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0']);
     }
 }

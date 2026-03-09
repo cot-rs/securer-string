@@ -179,9 +179,7 @@ mod tests {
         assert!(key_1 == key_3);
 
         let mut final_key = key_1.clone();
-        unsafe {
-            zero_out_secure_box(&mut final_key)
-        };
+        unsafe { zero_out_secure_box(&mut final_key) };
         assert_eq!(final_key.unsecure(), &[0; 32]);
     }
 }

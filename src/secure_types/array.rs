@@ -23,8 +23,7 @@ where
     pub(crate) content: [u8; LENGTH],
 }
 
-impl<const LENGTH: usize> SecureArray<LENGTH>
-{
+impl<const LENGTH: usize> SecureArray<LENGTH> {
     pub fn new(mut content: [u8; LENGTH]) -> Self {
         memlock::mlock(content.as_mut_ptr(), content.len());
         Self { content }
@@ -96,23 +95,20 @@ where
 }
 
 // Borrowing
-impl<const LENGTH: usize> Borrow<[u8]> for SecureArray<LENGTH>
-{
+impl<const LENGTH: usize> Borrow<[u8]> for SecureArray<LENGTH> {
     fn borrow(&self) -> &[u8] {
         self.content.borrow()
     }
 }
 
-impl<const LENGTH: usize> BorrowMut<[u8]> for SecureArray<LENGTH>
-{
+impl<const LENGTH: usize> BorrowMut<[u8]> for SecureArray<LENGTH> {
     fn borrow_mut(&mut self) -> &mut [u8] {
         self.content.borrow_mut()
     }
 }
 
 // Overwrite memory with zeros when we're done
-impl<const LENGTH: usize> Drop for SecureArray<LENGTH>
-{
+impl<const LENGTH: usize> Drop for SecureArray<LENGTH> {
     fn drop(&mut self) {
         self.zero_out();
         memlock::munlock(self.content.as_mut_ptr(), self.content.len());
@@ -120,15 +116,13 @@ impl<const LENGTH: usize> Drop for SecureArray<LENGTH>
 }
 
 // Make sure sensitive information is not logged accidentally
-impl<const LENGTH: usize> fmt::Debug for SecureArray<LENGTH>
-{
+impl<const LENGTH: usize> fmt::Debug for SecureArray<LENGTH> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str("***SECRET***").map_err(|_| fmt::Error)
     }
 }
 
-impl<const LENGTH: usize> fmt::Display for SecureArray<LENGTH>
-{
+impl<const LENGTH: usize> fmt::Display for SecureArray<LENGTH> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str("***SECRET***").map_err(|_| fmt::Error)
     }
