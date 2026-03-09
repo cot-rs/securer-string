@@ -77,7 +77,7 @@ impl Serialize for SecureVec<u8> {
     }
 }
 
-impl<'de, const LENGTH: usize> Deserialize<'de> for SecureArray<u8, LENGTH> {
+impl<'de, const LENGTH: usize> Deserialize<'de> for SecureArray<LENGTH> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -86,7 +86,7 @@ impl<'de, const LENGTH: usize> Deserialize<'de> for SecureArray<u8, LENGTH> {
     }
 }
 
-impl<const LENGTH: usize> Serialize for SecureArray<u8, LENGTH> {
+impl<const LENGTH: usize> Serialize for SecureArray<LENGTH> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn test_cbor_array() {
-        let data: SecureArray<_, 5> = SecureArray::from_str("hello").unwrap();
+        let data: SecureArray<5> = SecureArray::from_str("hello").unwrap();
         let cbor = serde_cbor::to_vec(&data).unwrap();
         assert_eq!(cbor, b"\x45hello");
         let deserialised = serde_cbor::from_slice(&cbor).unwrap();
