@@ -1,8 +1,6 @@
 use core::fmt;
 use std::str::FromStr;
 
-use subtle::ConstantTimeEq;
-
 use crate::{secure_utils::memlock, SecureVec};
 
 /// Wrapper for a vector that stores a valid UTF-8 string
@@ -75,10 +73,10 @@ impl SecureString {
     }
 }
 
-impl PartialEq for SecureString
-{
+impl PartialEq for SecureString {
     fn eq(&self, other: &SecureString) -> bool {
-        self.0.content.ct_eq(&other.0.content).into()
+        // use implementation of SecureVec
+        self.0 == other.0
     }
 }
 

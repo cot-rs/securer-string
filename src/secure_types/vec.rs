@@ -4,7 +4,6 @@ use std::{
     str::FromStr,
 };
 
-use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
@@ -21,7 +20,7 @@ use crate::secure_utils::memlock;
 ///
 /// Be careful with `SecureBytes::from`: if you have a borrowed string, it will be copied.
 /// Use `SecureBytes::new` if you have a `Vec<u8>`.
-#[derive(Eq, PartialOrd, Ord, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SecureVec<T>
 where
     T: Copy + Zeroize,
@@ -88,29 +87,6 @@ where
 impl<T: Copy + Zeroize> Clone for SecureVec<T> {
     fn clone(&self) -> Self {
         Self::new(self.content.clone())
-    }
-}
-
-impl<T> PartialEq for SecureVec<T>
-where
-    T: Copy + Zeroize,
-{
-    fn eq(&self, other: &Self) -> bool {
-        let self_bytes = unsafe {
-            std::slice::from_raw_parts(
-                self.content.as_ptr() as *const u8,
-                self.content.len() * std::mem::size_of::<T>(),
-            )
-        };
-
-        let other_bytes = unsafe {
-            std::slice::from_raw_parts(
-                other.content.as_ptr() as *const u8,
-                other.content.len() * std::mem::size_of::<T>(),
-            )
-        };
-        
-        self_bytes.ct_eq(other_bytes).into()
     }
 }
 

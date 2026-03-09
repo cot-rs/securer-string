@@ -4,7 +4,6 @@ use std::{
     str::FromStr,
 };
 
-use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
@@ -18,7 +17,7 @@ use crate::secure_utils::memlock;
 /// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
 ///
 /// Comparisons using the `PartialEq` implementation are undefined behavior (and most likely wrong) if `T` has any padding bytes.
-#[derive(Eq, PartialOrd, Ord, Hash)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct SecureArray<T, const LENGTH: usize>
 where
     T: Copy + Zeroize,
@@ -54,29 +53,6 @@ where
 impl<T: Copy + Zeroize, const LENGTH: usize> Clone for SecureArray<T, LENGTH> {
     fn clone(&self) -> Self {
         Self::new(self.content)
-    }
-}
-
-impl<T, const LENGTH: usize> PartialEq for SecureArray<T, LENGTH>
-where
-    T: Copy + Zeroize,
-{
-    fn eq(&self, other: &Self) -> bool {
-        let self_bytes = unsafe {
-            std::slice::from_raw_parts(
-                self.content.as_ptr() as *const T as *const u8,
-                LENGTH * std::mem::size_of::<T>(),
-            )
-        };
-
-        let other_bytes = unsafe {
-            std::slice::from_raw_parts(
-                other.content.as_ptr() as *const T as *const u8,
-                LENGTH * std::mem::size_of::<T>(),
-            )
-        };
-        
-        self_bytes.ct_eq(other_bytes).into()
     }
 }
 

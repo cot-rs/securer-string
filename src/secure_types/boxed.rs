@@ -4,7 +4,6 @@ use std::{
     mem::MaybeUninit,
 };
 
-use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
@@ -18,7 +17,7 @@ use crate::secure_utils::memlock;
 /// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
 ///
 /// Comparisons using the `PartialEq` implementation are undefined behavior (and most likely wrong) if `T` has any padding bytes.
-#[derive(Eq, PartialOrd, Ord, Hash)]
+#[derive(Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct SecureBox<T>
 where
     T: Copy,
@@ -51,29 +50,6 @@ where
 impl<T: Copy> Clone for SecureBox<T> {
     fn clone(&self) -> Self {
         Self::new(self.content.clone().unwrap())
-    }
-}
-
-impl<T> PartialEq for SecureBox<T>
-where
-    T: Copy,
-{
-    fn eq(&self, other: &Self) -> bool {
-        let self_bytes = unsafe {
-            std::slice::from_raw_parts(
-                self.content.as_ref().expect("SecureBox content should always be Some").as_ref() as *const T as *const u8,
-                std::mem::size_of::<T>(),
-            )
-        };
-        
-        let other_bytes = unsafe {
-            std::slice::from_raw_parts(
-                other.content.as_ref().expect("SecureBox content should always be Some").as_ref() as *const T as *const u8,
-                std::mem::size_of::<T>(),
-            )
-        };
-        
-        self_bytes.ct_eq(other_bytes).into()
     }
 }
 
