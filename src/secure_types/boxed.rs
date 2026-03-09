@@ -88,7 +88,6 @@ impl<T> Drop for SecureBox<T>
 where
     T: Copy,
 {
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn drop(&mut self) {
         // Make sure that the box does not need to be dropped after this function, because it may
         // see an invalid type, if `T` does not support an all-zero byte-pattern
@@ -158,7 +157,6 @@ mod tests {
     /// # Safety
     /// An all-zero byte-pattern must be a valid value of `T` in order for this function call to not be
     /// undefined behavior.
-    #[cfg_attr(feature = "pre", pre::pre("an all-zero byte-pattern is a valid value of `T`"))]
     pub(crate) unsafe fn zero_out_secure_box<T>(secure_box: &mut SecureBox<T>)
     where
         T: Copy,
@@ -171,7 +169,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn test_secure_box() {
         let key_1 = SecureBox::new(Box::new(PRIVATE_KEY_1));
         let key_2 = SecureBox::new(Box::new(PRIVATE_KEY_2));
@@ -182,13 +179,6 @@ mod tests {
         assert!(key_1 == key_3);
 
         let mut final_key = key_1.clone();
-        #[cfg_attr(
-            feature = "pre",
-            assure(
-                "an all-zero byte-pattern is a valid value of `T`",
-                reason = "`T` is `i32`, for which an all-zero byte-pattern is valid"
-            )
-        )]
         unsafe {
             zero_out_secure_box(&mut final_key)
         };

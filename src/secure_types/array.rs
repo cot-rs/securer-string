@@ -163,7 +163,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn test_zero_out() {
         let mut my_sec: SecureArray<_, 5> = SecureArray::from_str("hello").unwrap();
         my_sec.zero_out();
@@ -190,7 +189,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn test_comparison_zero_out_mb() {
         let mbstring1 = SecureArray::from(['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
         let mbstring2 = SecureArray::from(['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);

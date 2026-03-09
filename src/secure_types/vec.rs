@@ -183,24 +183,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn test_zero_out() {
         let mut my_sec = SecureBytes::from("hello");
         my_sec.zero_out();
         // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-        #[cfg_attr(
-            feature = "pre",
-            forward(impl pre::std::vec::Vec),
-            assure(
-                new_len <= self.capacity(),
-                reason = "the call to `zero_out` did not reduce the capacity and the length was `5` before,
-                so the capacity must be greater or equal to `5`"
-            ),
-            assure(
-                "the elements at `old_len..new_len` are initialized",
-                reason = "they were initialized to `0` by the call to `zero_out`"
-            )
-        )]
         unsafe {
             my_sec.content.set_len(5)
         }
@@ -240,7 +226,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn test_comparison_zero_out_mb() {
         let mbstring1 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
         let mbstring2 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
@@ -251,19 +236,6 @@ mod tests {
         let mut mbstring = mbstring1.clone();
         mbstring.zero_out();
         // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-        #[cfg_attr(
-            feature = "pre",
-            forward(impl pre::std::vec::Vec),
-            assure(
-                new_len <= self.capacity(),
-                reason = "the call to `zero_out` did not reduce the capacity and the length was `8` before,
-                so the capacity must be greater or equal to `8`"
-            ),
-            assure(
-                "the elements at `old_len..new_len` are initialized",
-                reason = "they were initialized to `0` by the call to `zero_out`"
-            )
-        )]
         unsafe {
             mbstring.content.set_len(8)
         }

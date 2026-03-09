@@ -9,60 +9,31 @@ pub struct SecureString(SecureVec<u8>);
 
 impl SecureString {
     /// Borrow the contents of the string.
-    #[cfg_attr(feature = "pre", pre::pre)]
     pub fn unsecure(&self) -> &str {
-        #[cfg_attr(
-            feature = "pre",
-            forward(pre),
-            assure(
-                "the content of `v` is valid UTF-8",
-                reason = "it is not possible to create a `SecureString` with invalid UTF-8 content
-                and it is also not possible to modify the content as non-UTF-8 directly, so
-                they must still be valid UTF-8 here"
-            )
-        )]
-        unsafe {
-            std::str::from_utf8_unchecked(self.0.unsecure())
-        }
+        // SAFETY: It is not possible to create a `SecureString` with invalid UTF-8 content,
+        // and it is also not possible to modify the content as non-UTF-8 directly, so
+        // the content must still be valid UTF-8 here.
+        unsafe { std::str::from_utf8_unchecked(self.0.unsecure()) }
     }
 
     /// Mutably borrow the contents of the string.
-    #[cfg_attr(feature = "pre", pre::pre)]
     pub fn unsecure_mut(&mut self) -> &mut str {
-        #[cfg_attr(
-            feature = "pre",
-            forward(pre),
-            assure(
-                "the content of `v` is valid UTF-8",
-                reason = "it is not possible to create a `SecureString` with invalid UTF-8 content
-                and it is also not possible to modify the content as non-UTF-8 directly, so
-                they must still be valid UTF-8 here"
-            )
-        )]
-        unsafe {
-            std::str::from_utf8_unchecked_mut(self.0.unsecure_mut())
-        }
+        // TODO: fix
+        // SAFETY: It is not possible to create a `SecureString` with invalid UTF-8 content,
+        // and it is also not possible to modify the content as non-UTF-8 directly, so
+        // the content must still be valid UTF-8 here.
+        unsafe { std::str::from_utf8_unchecked_mut(self.0.unsecure_mut()) }
     }
 
     /// Turn the string into a regular `String` again.
-    #[cfg_attr(feature = "pre", pre::pre)]
     pub fn into_unsecure(mut self) -> String {
         memlock::munlock(self.0.content.as_mut_ptr(), self.0.content.capacity());
         let content = std::mem::take(&mut self.0.content);
         std::mem::forget(self);
-        #[cfg_attr(
-            feature = "pre",
-            forward(impl pre::std::string::String),
-            assure(
-                "the content of `bytes` is valid UTF-8",
-                reason = "it is not possible to create a `SecureString` with invalid UTF-8 content
-                and it is also not possible to modify the content as non-UTF-8 directly, so
-                they must still be valid UTF-8 here"
-            )
-        )]
-        unsafe {
-            String::from_utf8_unchecked(content)
-        }
+        // SAFETY: It is not possible to create a `SecureString` with invalid UTF-8 content,
+        // and it is also not possible to modify the content as non-UTF-8 directly, so
+        // the content must still be valid UTF-8 here.
+        unsafe { String::from_utf8_unchecked(content) }
     }
 
     /// Overwrite the string with zeros. This is automatically called in the destructor.
