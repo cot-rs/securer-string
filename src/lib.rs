@@ -6,7 +6,7 @@ mod secure_utils;
 #[cfg(feature = "serde")]
 mod serde;
 
-pub use secure_types::{array::SecureArray, boxed::SecureBox, string::SecureString, vec::SecureBytes, vec::SecureVec};
+pub use secure_types::{array::SecureArray, string::SecureString, vec::SecureBytes, vec::SecureVec};
 
 #[doc = include_str!("../README.md")]
 #[cfg(doctest)]
