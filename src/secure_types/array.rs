@@ -174,19 +174,17 @@ mod tests {
         assert_eq!(format!("{}", SecureArray::<5>::from_str("hello").unwrap()), "***SECRET***".to_string());
     }
 
-    // TODO
-    // #[test]
-    // fn test_comparison_zero_out_mb() {
-    //     let mbstring1 = SecureArray::<8>::from(['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-    //     let mbstring2 = SecureArray::<8>::from(['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-    //     let mbstring3 = SecureArray::<8>::from(['!', '🦄', ' ', 'o', 'l', 'l', 'a', 'H']);
-    //     assert!(mbstring1 == mbstring2);
-    //     assert!(mbstring1 != mbstring3);
-    //
-    //     let mut mbstring = mbstring1.clone();
-    //     mbstring.zero_out();
-    //     for (given, expected) in zip(mbstring.unsecure(), ['\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0']) {
-    //         assert_eq!(*given, expected as u8);
-    //     }
-    // }
+    #[test]
+    fn test_comparison_zero_out_mb() {
+        // "Hallo 🦄!" is 11 UTF-8 bytes: 6 ASCII + 4 (🦄) + 1 (!)
+        let mbstring1 = SecureArray::<11>::from(*b"Hallo \xf0\x9f\xa4\x84!");
+        let mbstring2 = SecureArray::<11>::from(*b"Hallo \xf0\x9f\xa4\x84!");
+        let mbstring3 = SecureArray::<11>::from(*b"!\xf0\x9f\xa4\x84 ollaH");
+        assert!(mbstring1 == mbstring2);
+        assert!(mbstring1 != mbstring3);
+
+        let mut mbstring = mbstring1.clone();
+        mbstring.zero_out();
+        assert_eq!(mbstring.unsecure(), &[0u8; 11]);
+    }
 }

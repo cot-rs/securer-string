@@ -205,19 +205,19 @@ mod tests {
         assert_eq!(format!("{}", SecureBytes::from("hello")), "***SECRET***".to_string());
     }
 
-    // TODO
-    // #[test]
-    // fn test_comparison_zero_out_mb() {
-    //     let mbstring1 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-    //     let mbstring2 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-    //     let mbstring3 = SecureVec::from(vec!['!', '🦄', ' ', 'o', 'l', 'l', 'a', 'H']);
-    //     assert!(mbstring1 == mbstring2);
-    //     assert!(mbstring1 != mbstring3);
+    #[test]
+    fn test_comparison_zero_out_mb() {
+        let mbstring1 = SecureVec::from("Hallo 🦄!");
+        let mbstring2 = SecureVec::from("Hallo 🦄!");
+        let mbstring3 = SecureVec::from("!🦄 ollaH");
+        assert!(mbstring1 == mbstring2);
+        assert!(mbstring1 != mbstring3);
 
-    //     let mut mbstring = mbstring1.clone();
-    //     mbstring.zero_out();
-    //     // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-    //     unsafe { mbstring.content.set_len(8) }
-    //     assert_eq!(mbstring.unsecure(), &['\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0']);
-    // }
+        let len = mbstring1.unsecure().len();
+        let mut mbstring = mbstring1.clone();
+        mbstring.zero_out();
+        // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
+        unsafe { mbstring.content.set_len(len) }
+        assert_eq!(mbstring.unsecure(), vec![0u8; len]);
+    }
 }
