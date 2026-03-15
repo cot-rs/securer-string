@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
@@ -15,7 +16,7 @@ use crate::secure_utils::memlock;
 /// - Outputting `***SECRET***` to prevent leaking secrets into logs in `fmt::Debug` and `fmt::Display`
 /// - Automatic `mlock` to protect against leaking into swap (any unix)
 /// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
-#[derive(Eq, PartialEq, PartialOrd, Ord, Hash)]
+#[derive(Eq, PartialOrd, Ord, Hash)]
 pub struct SecureArray<const LENGTH: usize>
 where
     u8: Copy + Zeroize,
@@ -42,6 +43,12 @@ impl<const LENGTH: usize> SecureArray<LENGTH> {
     /// Overwrite the string with zeros. This is automatically called in the destructor.
     pub fn zero_out(&mut self) {
         self.content.zeroize()
+    }
+}
+
+impl<const LENGTH: usize> PartialEq for SecureArray<LENGTH> {
+    fn eq(&self, other: &SecureArray<LENGTH>) -> bool {
+        self.content.as_slice().ct_eq(other.content.as_slice()).into()
     }
 }
 

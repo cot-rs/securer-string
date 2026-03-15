@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
@@ -18,7 +19,7 @@ use crate::secure_utils::memlock;
 ///
 /// Be careful with `SecureVec::from`: if you have a borrowed string, it will be copied.
 /// Use `SecureVec::new` if you have a `Vec<u8>`.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Eq, PartialOrd, Ord, Hash)]
 pub struct SecureVec {
     pub(crate) content: Vec<u8>,
 }
@@ -73,6 +74,12 @@ impl SecureVec {
     /// This also sets the length to `0`.
     pub fn zero_out(&mut self) {
         self.content.zeroize()
+    }
+}
+
+impl PartialEq for SecureVec {
+    fn eq(&self, other: &SecureVec) -> bool {
+        self.content.as_slice().ct_eq(other.content.as_slice()).into()
     }
 }
 
