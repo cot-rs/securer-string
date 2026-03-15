@@ -16,37 +16,29 @@ use crate::secure_utils::memlock;
 /// - Automatic `mlock` to protect against leaking into swap (any unix)
 /// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
 ///
-/// Comparisons using the `PartialEq` implementation are undefined behavior (and most likely wrong) if `T` has any padding bytes.
-///
-/// Be careful with `SecureBytes::from`: if you have a borrowed string, it will be copied.
-/// Use `SecureBytes::new` if you have a `Vec<u8>`.
+/// Be careful with `SecureVec::from`: if you have a borrowed string, it will be copied.
+/// Use `SecureVec::new` if you have a `Vec<u8>`.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct SecureVec<T>
-where
-    T: Copy + Zeroize,
-{
-    pub(crate) content: Vec<T>,
+pub struct SecureVec {
+    pub(crate) content: Vec<u8>,
 }
 
 /// Type alias for a vector that stores just bytes
-pub type SecureBytes = SecureVec<u8>;
+pub type SecureBytes = SecureVec;
 
-impl<T> SecureVec<T>
-where
-    T: Copy + Zeroize,
-{
-    pub fn new(mut cont: Vec<T>) -> Self {
+impl SecureVec {
+    pub fn new(mut cont: Vec<u8>) -> Self {
         memlock::mlock(cont.as_mut_ptr(), cont.capacity());
         SecureVec { content: cont }
     }
 
     /// Borrow the contents of the string.
-    pub fn unsecure(&self) -> &[T] {
+    pub fn unsecure(&self) -> &[u8] {
         self.borrow()
     }
 
     /// Mutably borrow the contents of the string.
-    pub fn unsecure_mut(&mut self) -> &mut [T] {
+    pub fn unsecure_mut(&mut self) -> &mut [u8] {
         self.borrow_mut()
     }
 
@@ -58,8 +50,8 @@ where
     /// This ensures that the new memory region is secured if reallocation occurs.
     ///
     /// Similar to [`Vec::resize`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.resize)
-    pub fn resize(&mut self, new_len: usize, value: T) {
-        // Trucnate if shorter or same length
+    pub fn resize(&mut self, new_len: usize, value: u8) {
+        // Truncate if shorter or same length
         if new_len <= self.content.len() {
             self.content.truncate(new_len);
             return;
@@ -84,24 +76,23 @@ where
     }
 }
 
-impl<T: Copy + Zeroize> Clone for SecureVec<T> {
+impl Clone for SecureVec {
     fn clone(&self) -> Self {
         Self::new(self.content.clone())
     }
 }
 
 // Creation
-impl<T, U> From<U> for SecureVec<T>
+impl<U> From<U> for SecureVec
 where
-    U: Into<Vec<T>>,
-    T: Copy + Zeroize,
+    U: Into<Vec<u8>>,
 {
-    fn from(s: U) -> SecureVec<T> {
+    fn from(s: U) -> SecureVec {
         SecureVec::new(s.into())
     }
 }
 
-impl FromStr for SecureVec<u8> {
+impl FromStr for SecureVec {
     type Err = std::convert::Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -110,12 +101,11 @@ impl FromStr for SecureVec<u8> {
 }
 
 // Vec item indexing
-impl<T, U> std::ops::Index<U> for SecureVec<T>
+impl<U> std::ops::Index<U> for SecureVec
 where
-    T: Copy + Zeroize,
-    Vec<T>: std::ops::Index<U>,
+    Vec<u8>: std::ops::Index<U>,
 {
-    type Output = <Vec<T> as std::ops::Index<U>>::Output;
+    type Output = <Vec<u8> as std::ops::Index<U>>::Output;
 
     fn index(&self, index: U) -> &Self::Output {
         std::ops::Index::index(&self.content, index)
@@ -123,29 +113,20 @@ where
 }
 
 // Borrowing
-impl<T> Borrow<[T]> for SecureVec<T>
-where
-    T: Copy + Zeroize,
-{
-    fn borrow(&self) -> &[T] {
+impl Borrow<[u8]> for SecureVec {
+    fn borrow(&self) -> &[u8] {
         self.content.borrow()
     }
 }
 
-impl<T> BorrowMut<[T]> for SecureVec<T>
-where
-    T: Copy + Zeroize,
-{
-    fn borrow_mut(&mut self) -> &mut [T] {
+impl BorrowMut<[u8]> for SecureVec {
+    fn borrow_mut(&mut self) -> &mut [u8] {
         self.content.borrow_mut()
     }
 }
 
 // Overwrite memory with zeros when we're done
-impl<T> Drop for SecureVec<T>
-where
-    T: Copy + Zeroize,
-{
+impl Drop for SecureVec {
     fn drop(&mut self) {
         self.zero_out();
         memlock::munlock(self.content.as_mut_ptr(), self.content.capacity());
@@ -153,19 +134,13 @@ where
 }
 
 // Make sure sensitive information is not logged accidentally
-impl<T> fmt::Debug for SecureVec<T>
-where
-    T: Copy + Zeroize,
-{
+impl fmt::Debug for SecureVec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str("***SECRET***").map_err(|_| fmt::Error)
     }
 }
 
-impl<T> fmt::Display for SecureVec<T>
-where
-    T: Copy + Zeroize,
-{
+impl fmt::Display for SecureVec {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str("***SECRET***").map_err(|_| fmt::Error)
     }
@@ -193,7 +168,7 @@ mod tests {
 
     #[test]
     fn test_resize() {
-        let mut my_sec = SecureVec::from([0, 1]);
+        let mut my_sec = SecureVec::from([0u8, 1u8]);
         assert_eq!(my_sec.unsecure().len(), 2);
         my_sec.resize(1, 0);
         assert_eq!(my_sec.unsecure().len(), 1);
@@ -223,18 +198,19 @@ mod tests {
         assert_eq!(format!("{}", SecureBytes::from("hello")), "***SECRET***".to_string());
     }
 
-    #[test]
-    fn test_comparison_zero_out_mb() {
-        let mbstring1 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-        let mbstring2 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-        let mbstring3 = SecureVec::from(vec!['!', '🦄', ' ', 'o', 'l', 'l', 'a', 'H']);
-        assert!(mbstring1 == mbstring2);
-        assert!(mbstring1 != mbstring3);
+    // TODO
+    // #[test]
+    // fn test_comparison_zero_out_mb() {
+    //     let mbstring1 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
+    //     let mbstring2 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
+    //     let mbstring3 = SecureVec::from(vec!['!', '🦄', ' ', 'o', 'l', 'l', 'a', 'H']);
+    //     assert!(mbstring1 == mbstring2);
+    //     assert!(mbstring1 != mbstring3);
 
-        let mut mbstring = mbstring1.clone();
-        mbstring.zero_out();
-        // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-        unsafe { mbstring.content.set_len(8) }
-        assert_eq!(mbstring.unsecure(), &['\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0']);
-    }
+    //     let mut mbstring = mbstring1.clone();
+    //     mbstring.zero_out();
+    //     // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
+    //     unsafe { mbstring.content.set_len(8) }
+    //     assert_eq!(mbstring.unsecure(), &['\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0']);
+    // }
 }

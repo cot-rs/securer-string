@@ -5,7 +5,7 @@ use crate::{secure_utils::memlock, SecureVec};
 
 /// Wrapper for a vector that stores a valid UTF-8 string
 #[derive(Clone, Eq)]
-pub struct SecureString(SecureVec<u8>);
+pub struct SecureString(SecureVec);
 
 impl SecureString {
     /// Borrow the contents of the string.
