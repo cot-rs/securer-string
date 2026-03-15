@@ -59,8 +59,8 @@ where
     }
 }
 
-impl<'de> Deserialize<'de> for SecureVec<u8> {
-    fn deserialize<D>(deserializer: D) -> Result<SecureVec<u8>, D::Error>
+impl<'de> Deserialize<'de> for SecureVec {
+    fn deserialize<D>(deserializer: D) -> Result<SecureVec, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -68,7 +68,7 @@ impl<'de> Deserialize<'de> for SecureVec<u8> {
     }
 }
 
-impl Serialize for SecureVec<u8> {
+impl Serialize for SecureVec {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -126,7 +126,7 @@ mod tests {
         let json = serde_json::to_string_pretty(secure_bytes.unsecure()).unwrap();
         println!("json = {json}");
 
-        let secure_bytes_serde: SecureVec<u8> = serde_json::from_str(&json).unwrap();
+        let secure_bytes_serde: SecureVec = serde_json::from_str(&json).unwrap();
 
         assert_eq!(secure_bytes, secure_bytes_serde);
     }
