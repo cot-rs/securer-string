@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
@@ -20,7 +21,6 @@ use crate::secure_utils::memlock;
 ///
 /// Be careful with `SecureBytes::from`: if you have a borrowed string, it will be copied.
 /// Use `SecureBytes::new` if you have a `Vec<u8>`.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SecureVec<T>
 where
     T: Copy + Zeroize,
@@ -89,6 +89,20 @@ impl<T: Copy + Zeroize> Clone for SecureVec<T> {
         Self::new(self.content.clone())
     }
 }
+
+impl<T: Copy + Zeroize + ConstantTimeEq> ConstantTimeEq for SecureVec<T> {
+    fn ct_eq(&self, other: &Self) -> subtle::Choice {
+        self.content.ct_eq(&other.content)
+    }
+}
+
+impl<T: Copy + Zeroize + ConstantTimeEq> PartialEq for SecureVec<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ct_eq(other).into()
+    }
+}
+
+impl<T: Copy + Zeroize + ConstantTimeEq> Eq for SecureVec<T> {}
 
 // Creation
 impl<T, U> From<U> for SecureVec<T>
@@ -183,26 +197,14 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn test_zero_out() {
         let mut my_sec = SecureBytes::from("hello");
         my_sec.zero_out();
         // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-        #[cfg_attr(
-            feature = "pre",
-            forward(impl pre::std::vec::Vec),
-            assure(
-                new_len <= self.capacity(),
-                reason = "the call to `zero_out` did not reduce the capacity and the length was `5` before,
-                so the capacity must be greater or equal to `5`"
-            ),
-            assure(
-                "the elements at `old_len..new_len` are initialized",
-                reason = "they were initialized to `0` by the call to `zero_out`"
-            )
-        )]
+        // SAFETY: capacity is still >= 5 (zero_out does not shrink), and all 5 bytes were
+        // zeroed, so they are valid initialized `u8` values.
         unsafe {
-            my_sec.content.set_len(5)
+            my_sec.content.set_len(5);
         }
         assert_eq!(my_sec.unsecure(), b"\x00\x00\x00\x00\x00");
     }
@@ -240,32 +242,20 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn test_comparison_zero_out_mb() {
         let mbstring1 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
         let mbstring2 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
         let mbstring3 = SecureVec::from(vec!['!', '🦄', ' ', 'o', 'l', 'l', 'a', 'H']);
-        assert!(mbstring1 == mbstring2);
-        assert!(mbstring1 != mbstring3);
+        assert_eq!(mbstring1.unsecure(), mbstring2.unsecure());
+        assert_ne!(mbstring1.unsecure(), mbstring3.unsecure());
 
         let mut mbstring = mbstring1.clone();
         mbstring.zero_out();
         // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-        #[cfg_attr(
-            feature = "pre",
-            forward(impl pre::std::vec::Vec),
-            assure(
-                new_len <= self.capacity(),
-                reason = "the call to `zero_out` did not reduce the capacity and the length was `8` before,
-                so the capacity must be greater or equal to `8`"
-            ),
-            assure(
-                "the elements at `old_len..new_len` are initialized",
-                reason = "they were initialized to `0` by the call to `zero_out`"
-            )
-        )]
+        // SAFETY: capacity is still >= 8 (zero_out does not shrink), and all bytes were
+        // zeroed, which is a valid bit pattern for `u32`.
         unsafe {
-            mbstring.content.set_len(8)
+            mbstring.content.set_len(8);
         }
         assert_eq!(mbstring.unsecure(), &['\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0']);
     }

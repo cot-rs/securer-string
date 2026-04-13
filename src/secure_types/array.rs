@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
@@ -16,8 +17,6 @@ use crate::secure_utils::memlock;
 /// - Automatic `mlock` to protect against leaking into swap (any unix)
 /// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
 ///
-/// Comparisons using the `PartialEq` implementation are undefined behavior (and most likely wrong) if `T` has any padding bytes.
-#[derive(Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct SecureArray<T, const LENGTH: usize>
 where
     T: Copy + Zeroize,
@@ -55,6 +54,20 @@ impl<T: Copy + Zeroize, const LENGTH: usize> Clone for SecureArray<T, LENGTH> {
         Self::new(self.content)
     }
 }
+
+impl<T: Copy + Zeroize + ConstantTimeEq, const LENGTH: usize> ConstantTimeEq for SecureArray<T, LENGTH> {
+    fn ct_eq(&self, other: &Self) -> subtle::Choice {
+        self.content.as_slice().ct_eq(other.content.as_slice())
+    }
+}
+
+impl<T: Copy + Zeroize + ConstantTimeEq, const LENGTH: usize> PartialEq for SecureArray<T, LENGTH> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ct_eq(other).into()
+    }
+}
+
+impl<T: Copy + Zeroize + ConstantTimeEq, const LENGTH: usize> Eq for SecureArray<T, LENGTH> {}
 
 // Creation
 impl<T, const LENGTH: usize> From<[T; LENGTH]> for SecureArray<T, LENGTH>
@@ -163,7 +176,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn test_zero_out() {
         let mut my_sec: SecureArray<_, 5> = SecureArray::from_str("hello").unwrap();
         my_sec.zero_out();
@@ -190,16 +202,15 @@ mod tests {
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
-    fn test_comparison_zero_out_mb() {
-        let mbstring1 = SecureArray::from(['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-        let mbstring2 = SecureArray::from(['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-        let mbstring3 = SecureArray::from(['!', '🦄', ' ', 'o', 'l', 'l', 'a', 'H']);
-        assert!(mbstring1 == mbstring2);
-        assert!(mbstring1 != mbstring3);
+    fn test_comparison_zero_out_multibyte() {
+        let data1 = SecureArray::from([0x0048u32, 0x0061, 0x006C, 0x006C, 0x006F, 0x0020, 0x1F984, 0x0021]);
+        let data2 = SecureArray::from([0x0048u32, 0x0061, 0x006C, 0x006C, 0x006F, 0x0020, 0x1F984, 0x0021]);
+        let data3 = SecureArray::from([0x0021u32, 0x1F984, 0x0020, 0x006F, 0x006C, 0x006C, 0x0061, 0x0048]);
+        assert!(data1 == data2);
+        assert!(data1 != data3);
 
-        let mut mbstring = mbstring1.clone();
-        mbstring.zero_out();
-        assert_eq!(mbstring.unsecure(), &['\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0']);
+        let mut zeroed = data1.clone();
+        zeroed.zero_out();
+        assert_eq!(zeroed.unsecure(), &[0u32; 8]);
     }
 }

@@ -3,10 +3,14 @@
 mod secure_types;
 mod secure_utils;
 
+#[cfg(test)]
+mod test_utils;
+
 #[cfg(feature = "serde")]
 mod serde;
 
 pub use secure_types::{array::SecureArray, boxed::SecureBox, string::SecureString, vec::SecureBytes, vec::SecureVec};
+pub use subtle::ConstantTimeEq;
 
 #[doc = include_str!("../README.md")]
 #[cfg(doctest)]

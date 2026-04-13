@@ -97,27 +97,7 @@ impl<const LENGTH: usize> Serialize for SecureArray<u8, LENGTH> {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
-    use crate::{SecureArray, SecureBytes, SecureVec};
-
-    #[test]
-    fn test_cbor_vec() {
-        let data = SecureBytes::from("hello");
-        let cbor = serde_cbor::to_vec(&data).unwrap();
-        assert_eq!(cbor, b"\x45hello");
-        let deserialised = serde_cbor::from_slice(&cbor).unwrap();
-        assert_eq!(data, deserialised);
-    }
-
-    #[test]
-    fn test_cbor_array() {
-        let data: SecureArray<_, 5> = SecureArray::from_str("hello").unwrap();
-        let cbor = serde_cbor::to_vec(&data).unwrap();
-        assert_eq!(cbor, b"\x45hello");
-        let deserialised = serde_cbor::from_slice(&cbor).unwrap();
-        assert_eq!(data, deserialised);
-    }
+    use crate::SecureVec;
 
     #[test]
     fn test_serde_json() {

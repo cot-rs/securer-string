@@ -11,11 +11,10 @@ documentation = "https://docs.rs/secure-string/"
 edition = "2021"
 
 [dependencies]
-libc = "0.2.148"
-zeroize = { version = "1.6.0", features = ["std"] }
-serde = { version = "1.0.188", optional = true }
+libc = "0.2"
+subtle = "2"
+zeroize = { version = "1", features = ["std"] }
+serde = { version = "1", optional = true }
 
 [dev-dependencies]
-pre = "0.2.1"
-serde_cbor = "0.11"
-serde_json = "1.0.105"
+serde_json = "1"

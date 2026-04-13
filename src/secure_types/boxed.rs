@@ -4,6 +4,7 @@ use std::{
     mem::MaybeUninit,
 };
 
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
@@ -16,8 +17,6 @@ use crate::secure_utils::memlock;
 /// - Automatic `mlock` to protect against leaking into swap (any unix)
 /// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
 ///
-/// Comparisons using the `PartialEq` implementation are undefined behavior (and most likely wrong) if `T` has any padding bytes.
-#[derive(Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct SecureBox<T>
 where
     T: Copy,
@@ -36,22 +35,44 @@ where
         SecureBox { content: Some(cont) }
     }
 
+    fn content_ref(&self) -> &T {
+        self.content.as_deref().expect("SecureBox content accessed after drop")
+    }
+
+    fn content_mut(&mut self) -> &mut T {
+        self.content.as_deref_mut().expect("SecureBox content accessed after drop")
+    }
+
     /// Borrow the contents of the string.
     pub fn unsecure(&self) -> &T {
-        self.content.as_ref().unwrap()
+        self.content_ref()
     }
 
     /// Mutably borrow the contents of the string.
     pub fn unsecure_mut(&mut self) -> &mut T {
-        self.content.as_mut().unwrap()
+        self.content_mut()
     }
 }
 
 impl<T: Copy> Clone for SecureBox<T> {
     fn clone(&self) -> Self {
-        Self::new(self.content.clone().unwrap())
+        Self::new(Box::new(*self.content_ref()))
     }
 }
+
+impl<T: Copy + ConstantTimeEq> ConstantTimeEq for SecureBox<T> {
+    fn ct_eq(&self, other: &Self) -> subtle::Choice {
+        self.content_ref().ct_eq(other.content_ref())
+    }
+}
+
+impl<T: Copy + ConstantTimeEq> PartialEq for SecureBox<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.ct_eq(other).into()
+    }
+}
+
+impl<T: Copy + ConstantTimeEq> Eq for SecureBox<T> {}
 
 // Delegate indexing
 impl<T, U> std::ops::Index<U> for SecureBox<T>
@@ -61,7 +82,7 @@ where
     type Output = <T as std::ops::Index<U>>::Output;
 
     fn index(&self, index: U) -> &Self::Output {
-        std::ops::Index::index(self.content.as_ref().unwrap().as_ref(), index)
+        std::ops::Index::index(self.content_ref(), index)
     }
 }
 
@@ -71,7 +92,7 @@ where
     T: Copy,
 {
     fn borrow(&self) -> &T {
-        self.content.as_ref().unwrap()
+        self.content_ref()
     }
 }
 impl<T> BorrowMut<T> for SecureBox<T>
@@ -79,7 +100,7 @@ where
     T: Copy,
 {
     fn borrow_mut(&mut self) -> &mut T {
-        self.content.as_mut().unwrap()
+        self.content_mut()
     }
 }
 
@@ -88,17 +109,19 @@ impl<T> Drop for SecureBox<T>
 where
     T: Copy,
 {
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn drop(&mut self) {
         // Make sure that the box does not need to be dropped after this function, because it may
         // see an invalid type, if `T` does not support an all-zero byte-pattern
         // Instead we manually destruct the box and only handle the potentially invalid values
         // behind the pointer
-        let ptr = Box::into_raw(self.content.take().unwrap());
+        let ptr = Box::into_raw(self.content.take().expect("SecureBox dropped twice"));
 
         // There is no need to worry about dropping the contents, because `T: Copy` and `Copy`
         // types cannot implement `Drop`
 
+        // SAFETY: `ptr` was just obtained from `Box::into_raw` so it is valid, aligned, and
+        // points to `size_of::<T>()` allocated bytes. Writing `MaybeUninit<u8>` zeros is always
+        // valid regardless of `T`'s invariants.
         unsafe {
             std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(ptr as *mut MaybeUninit<u8>, std::mem::size_of::<T>()).zeroize();
         }
@@ -107,10 +130,9 @@ where
 
         // Deallocate only non-zero-sized types, because otherwise it's UB
         if std::mem::size_of::<T>() != 0 {
-            // Safety:
-            // This way to manually deallocate is advertised in the documentation of `Box::into_raw`.
-            // The box was allocated with the global allocator and a layout of `T` and is thus
-            // deallocated using the same allocator and layout here.
+            // SAFETY: This way to manually deallocate is advertised in the documentation of
+            // `Box::into_raw`. The box was allocated with the global allocator and a layout of
+            // `T` and is thus deallocated using the same allocator and layout here.
             unsafe { std::alloc::dealloc(ptr as *mut u8, std::alloc::Layout::new::<T>()) };
         }
     }
@@ -142,36 +164,28 @@ mod tests {
     use zeroize::Zeroize;
 
     use super::SecureBox;
+    use crate::test_utils::{Packed, Padded, PRIVATE_KEY_1, PRIVATE_KEY_2};
 
-    const PRIVATE_KEY_1: [u8; 32] = [
-        0xb0, 0x3b, 0x34, 0xc3, 0x3a, 0x1c, 0x44, 0xf2, 0x25, 0xb6, 0x62, 0xd2, 0xbf, 0x48, 0x59, 0xb8, 0x13, 0x54, 0x11, 0xfa,
-        0x7b, 0x03, 0x86, 0xd4, 0x5f, 0xb7, 0x5d, 0xc5, 0xb9, 0x1b, 0x44, 0x66,
-    ];
-
-    const PRIVATE_KEY_2: [u8; 32] = [
-        0xc8, 0x06, 0x43, 0x9d, 0xc9, 0xd2, 0xc4, 0x76, 0xff, 0xed, 0x8f, 0x25, 0x80, 0xc0, 0x88, 0x8d, 0x58, 0xab, 0x40, 0x6b,
-        0xf7, 0xae, 0x36, 0x98, 0x87, 0x90, 0x21, 0xb9, 0x6b, 0xb4, 0xbf, 0x59,
-    ];
-
-    /// Overwrite the contents with zeros. This is automatically done in the destructor.
+    /// Overwrite the contents with zeros.
     ///
     /// # Safety
     /// An all-zero byte-pattern must be a valid value of `T` in order for this function call to not be
     /// undefined behavior.
-    #[cfg_attr(feature = "pre", pre::pre("an all-zero byte-pattern is a valid value of `T`"))]
-    pub(crate) unsafe fn zero_out_secure_box<T>(secure_box: &mut SecureBox<T>)
+    unsafe fn zero_out_secure_box<T>(secure_box: &mut SecureBox<T>)
     where
         T: Copy,
     {
+        // SAFETY: The pointer is derived from a live `Box<T>` via mutable reference, so it is
+        // valid and aligned for `size_of::<T>()` bytes. The caller guarantees that an all-zero
+        // byte-pattern is a valid value of `T`.
         std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(
-            &mut **secure_box.content.as_mut().unwrap() as *mut T as *mut MaybeUninit<u8>,
+            secure_box.content_mut() as *mut T as *mut MaybeUninit<u8>,
             std::mem::size_of::<T>(),
         )
         .zeroize();
     }
 
     #[test]
-    #[cfg_attr(feature = "pre", pre::pre)]
     fn test_secure_box() {
         let key_1 = SecureBox::new(Box::new(PRIVATE_KEY_1));
         let key_2 = SecureBox::new(Box::new(PRIVATE_KEY_2));
@@ -182,16 +196,39 @@ mod tests {
         assert!(key_1 == key_3);
 
         let mut final_key = key_1.clone();
-        #[cfg_attr(
-            feature = "pre",
-            assure(
-                "an all-zero byte-pattern is a valid value of `T`",
-                reason = "`T` is `i32`, for which an all-zero byte-pattern is valid"
-            )
-        )]
+        // SAFETY: `T` is `Key([u8; 32])`, for which an all-zero byte-pattern is valid.
         unsafe {
-            zero_out_secure_box(&mut final_key)
-        };
-        assert_eq!(final_key.unsecure(), &[0; 32]);
+            zero_out_secure_box(&mut final_key);
+        }
+        assert_eq!(final_key.unsecure().0, [0; 32]);
+    }
+
+    #[test]
+    fn test_repr_c_with_padding() {
+        assert_eq!(std::mem::size_of::<Padded>(), 4); // 1 + 1 (pad) + 2
+
+        let sec_a = SecureBox::new(Box::new(Padded { x: 1, y: 2 }));
+        let sec_b = SecureBox::new(Box::new(Padded { x: 1, y: 2 }));
+        assert_eq!(sec_a, sec_b);
+
+        let sec_c = SecureBox::new(Box::new(Padded { x: 1, y: 3 }));
+        assert_ne!(sec_a, sec_c);
+
+        let sec_d = SecureBox::new(Box::new(Padded { x: 2, y: 2 }));
+        assert_ne!(sec_a, sec_d);
+    }
+
+    #[test]
+    fn test_repr_c_packed() {
+        assert_eq!(std::mem::size_of::<Packed>(), 3);
+
+        let sec_a = SecureBox::new(Box::new(Packed { x: 42, y: 1000 }));
+        let sec_b = SecureBox::new(Box::new(Packed { x: 42, y: 1000 }));
+        let sec_c = SecureBox::new(Box::new(Packed { x: 42, y: 1001 }));
+        let sec_d = SecureBox::new(Box::new(Packed { x: 43, y: 1000 }));
+
+        assert_eq!(sec_a, sec_b);
+        assert_ne!(sec_a, sec_c);
+        assert_ne!(sec_a, sec_d);
     }
 }
