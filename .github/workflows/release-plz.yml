@@ -1,0 +1,80 @@
+name: Release-plz
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  release-plz-release:
+    if: ${{ github.repository_owner == 'cot-rs' }}
+
+    name: Release-plz release
+    runs-on: ubuntu-latest
+    environment: "crates.io release"
+
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Generate GitHub token
+        uses: actions/create-github-app-token@v3
+        id: generate-token
+        with:
+          app-id: ${{ secrets.COTBOT_APP_ID }}
+          private-key: ${{ secrets.COTBOT_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run release-plz
+        uses: release-plz/action@v0.5
+        with:
+          command: release
+          config: .cargo/release-plz.toml
+        env:
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
+
+  release-plz-pr:
+    if: ${{ github.repository_owner == 'cot-rs' }}
+
+    name: Release-plz PR
+    runs-on: ubuntu-latest
+
+    permissions:
+      pull-requests: write
+      contents: write
+
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Generate GitHub token
+        uses: actions/create-github-app-token@v3
+        id: generate-token
+        with:
+          app-id: ${{ secrets.COTBOT_APP_ID }}
+          private-key: ${{ secrets.COTBOT_PRIVATE_KEY }}
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run release-plz
+        uses: release-plz/action@v0.5
+        with:
+          command: release-pr
+          config: .cargo/release-plz.toml
+        env:
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}

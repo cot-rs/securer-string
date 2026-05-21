@@ -1,0 +1,82 @@
+[workspace]
+git_release_enable = true
+changelog_update = true
+git_release_draft = true
+git_release_body = """
+{{ changelog }}
+{% if remote.contributors %}
+### Contributors
+{% for contributor in remote.contributors %}
+* @{{ contributor.username }}
+{% endfor %}
+{% endif %}
+"""
+
+[changelog]
+header = """# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), \
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+"""
+
+body = """
+
+## [{{ version }}]\
+    {%- if release_link -%}\
+        ({{ release_link }})\
+    {% endif %} \
+    - {{ timestamp | date(format="%Y-%m-%d") }}
+
+    {% if previous.version -%}\
+        [View diff on diff.rs](https://diff.rs/{{ package }}/{{ previous.version }}/{{ package }}/{{ version }}/Cargo.toml)
+    {%- endif %}
+{% for group, group_commits in commits | filter(attribute="remote.pr_number") | sort(attribute="remote.pr_number") | reverse | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+
+    {% for commit in group_commits %}
+        {%- if commit.breaking -%}{{ self::commit_line(commit=commit) }}
+        {% endif -%}
+    {% endfor -%}
+    {% for commit in group_commits %}
+        {%- if not commit.breaking -%}{{ self::commit_line(commit=commit) }}
+        {% endif -%}
+    {% endfor -%}
+{% endfor %}
+{%- for commit in commits -%}
+    {%- if not commit.remote.pr_number %}
+- {% if commit.breaking %}[**breaking**] {% endif %}{{ commit.message | upper_first }}{{ self::username(commit=commit) }}
+    {%- endif -%}
+{%- endfor %}
+{%- macro username(commit) -%}
+    {% if commit.remote.username %} (by [@{{ commit.remote.username }}](https://github.com/{{ commit.remote.username }})){% endif -%}
+{% endmacro -%}
+{%- macro commit_line(commit) -%}
+- {% if commit.breaking -%}
+    [**breaking**] {% endif -%}
+  {%- if commit.scope -%}
+    *({{commit.scope}})* {% endif -%}
+  {{ commit.message | upper_first }}{{ self::username(commit=commit) }}
+{%- endmacro -%}
+"""
+
+protect_breaking_commits = true
+commit_parsers = [
+    { message = "^.*\\(security\\)", group = "<!-- 0 -->Security", scope = "" },
+    { message = "^feat", group = "<!-- 1 -->New features" },
+    { message = "^fix", group = "<!-- 2 -->Fixes" },
+    { message = "^.*", group = "<!-- 3 -->Other" },
+]
+commit_preprocessors = [
+    # Replace multiple spaces with a single space.
+    { pattern = "  +", replace = " " },
+    # Replace the issue/PR number with the link. It will work for PRs as well as GitHub has a redirect.
+    { pattern = "\\(#([0-9]+)\\)", replace = "([#${1}](https://github.com/cot-rs/securer-string/pull/${1}))" },
+    # Hyperlink bare commit hashes like "abcd1234" in commit logs, with short commit hash as description.
+    { pattern = "([ \\n])(([a-f0-9]{7})[a-f0-9]*)", replace = "${1}commit [${3}](https://github.com/cot-rs/securer-string/commit/${2})" },
+    # Fix automatic revert commit name
+    { pattern = "^Revert", replace = "chore(revert):" }
+]
