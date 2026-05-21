@@ -40,12 +40,14 @@ impl<T> SecureVec<T>
 where
     T: Copy + Zeroize,
 {
+    #[must_use]
     pub fn new(mut cont: Vec<T>) -> Self {
         memlock::mlock(cont.as_mut_ptr(), cont.capacity());
         SecureVec { content: cont }
     }
 
     /// Borrow the contents of the string.
+    #[must_use]
     pub fn unsecure(&self) -> &[T] {
         self.borrow()
     }
@@ -88,7 +90,7 @@ where
     ///
     /// This also sets the length to `0`.
     pub fn zero_out(&mut self) {
-        self.content.zeroize()
+        self.content.zeroize();
     }
 }
 

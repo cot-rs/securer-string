@@ -48,7 +48,7 @@ where
     /// Overwrite the string with zeros. This is automatically called in the
     /// destructor.
     pub fn zero_out(&mut self) {
-        self.content.zeroize()
+        self.content.zeroize();
     }
 }
 

@@ -32,14 +32,20 @@ impl<T> SecureBox<T>
 where
     T: Copy,
 {
+    #[must_use]
     pub fn new(mut cont: Box<T>) -> Self {
-        memlock::mlock(&mut *cont, 1);
+        memlock::mlock(&raw mut *cont, 1);
         SecureBox {
             content: Some(cont),
         }
     }
 
     /// Borrow the contents of the string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the content has already been dropped.
+    #[must_use]
     pub fn unsecure(&self) -> &T {
         self.content
             .as_deref()
@@ -47,6 +53,10 @@ where
     }
 
     /// Mutably borrow the contents of the string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the content has already been dropped.
     pub fn unsecure_mut(&mut self) -> &mut T {
         self.content
             .as_deref_mut()
@@ -125,7 +135,7 @@ where
         // invariants.
         unsafe {
             std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(
-                ptr as *mut MaybeUninit<u8>,
+                ptr.cast::<MaybeUninit<u8>>(),
                 std::mem::size_of::<T>(),
             )
             .zeroize();
@@ -139,7 +149,7 @@ where
             // `Box::into_raw`. The box was allocated with the global allocator and a layout
             // of `T` and is thus deallocated using the same allocator and
             // layout here.
-            unsafe { std::alloc::dealloc(ptr as *mut u8, std::alloc::Layout::new::<T>()) };
+            unsafe { std::alloc::dealloc(ptr.cast::<u8>(), std::alloc::Layout::new::<T>()) };
         }
     }
 }

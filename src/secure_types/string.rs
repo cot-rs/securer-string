@@ -10,6 +10,7 @@ pub struct SecureString(SecureVec<u8>);
 
 impl SecureString {
     /// Borrow the contents of the string.
+    #[must_use]
     pub fn unsecure(&self) -> &str {
         // SAFETY: SecureString can only be constructed from valid UTF-8 (String or
         // &str), and the contents cannot be modified as non-UTF-8, so they
@@ -24,6 +25,7 @@ impl SecureString {
     }
 
     /// Turn the string into a regular `String` again.
+    #[must_use]
     pub fn into_unsecure(mut self) -> String {
         memlock::munlock(self.0.content.as_mut_ptr(), self.0.content.capacity());
         let content = std::mem::take(&mut self.0.content);
@@ -37,7 +39,7 @@ impl SecureString {
     ///
     /// This also sets the length to `0`.
     pub fn zero_out(&mut self) {
-        self.0.zero_out()
+        self.0.zero_out();
     }
 }
 
