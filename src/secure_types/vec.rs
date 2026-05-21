@@ -234,10 +234,10 @@ mod tests {
     #[test]
     fn test_comparison() {
         assert_eq!(SecureBytes::from("hello"), SecureBytes::from("hello"));
-        assert!(SecureBytes::from("hello") != SecureBytes::from("yolo"));
-        assert!(SecureBytes::from("hello") != SecureBytes::from("olleh"));
-        assert!(SecureBytes::from("hello") != SecureBytes::from("helloworld"));
-        assert!(SecureBytes::from("hello") != SecureBytes::from(""));
+        assert_ne!(SecureBytes::from("hello"), SecureBytes::from("yolo"));
+        assert_ne!(SecureBytes::from("hello"), SecureBytes::from("olleh"));
+        assert_ne!(SecureBytes::from("hello"), SecureBytes::from("helloworld"));
+        assert_ne!(SecureBytes::from("hello"), SecureBytes::from(""));
     }
 
     #[test]
@@ -291,8 +291,8 @@ mod tests {
             'a' as u32,
             'H' as u32,
         ]);
-        assert!(mbstring1 == mbstring2);
-        assert!(mbstring1 != mbstring3);
+        assert_eq!(mbstring1, mbstring2);
+        assert_ne!(mbstring1, mbstring3);
 
         let mut mbstring = mbstring1.clone();
         mbstring.zero_out();

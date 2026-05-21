@@ -191,14 +191,16 @@ mod tests {
     where
         T: Copy,
     {
-        // SAFETY: The pointer is derived from a live `Box<T>` via mutable reference, so
-        // it is valid and aligned for `size_of::<T>()` bytes. The caller
-        // guarantees that an all-zero byte-pattern is a valid value of `T`.
-        std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(
-            secure_box.unsecure_mut() as *mut T as *mut MaybeUninit<u8>,
-            std::mem::size_of::<T>(),
-        )
-        .zeroize();
+        unsafe {
+            // SAFETY: The pointer is derived from a live `Box<T>` via mutable reference, so
+            // it is valid and aligned for `size_of::<T>()` bytes. The caller
+            // guarantees that an all-zero byte-pattern is a valid value of `T`.
+            std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(
+                std::ptr::from_mut::<T>(secure_box.unsecure_mut()).cast::<MaybeUninit<u8>>(),
+                std::mem::size_of::<T>(),
+            )
+            .zeroize();
+        }
     }
 
     #[test]
@@ -206,10 +208,10 @@ mod tests {
         let key_1 = SecureBox::new(Box::new(PRIVATE_KEY_1));
         let key_2 = SecureBox::new(Box::new(PRIVATE_KEY_2));
         let key_3 = SecureBox::new(Box::new(PRIVATE_KEY_1));
-        assert!(key_1 == key_1);
-        assert!(key_1 != key_2);
-        assert!(key_2 != key_3);
-        assert!(key_1 == key_3);
+        assert_eq!(key_1, key_1);
+        assert_ne!(key_1, key_2);
+        assert_ne!(key_2, key_3);
+        assert_eq!(key_1, key_3);
 
         let mut final_key = key_1.clone();
         unsafe {

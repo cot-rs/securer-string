@@ -1,1 +1,1 @@
-doc-valid-idents = ["DragonflyBSD", "FreeBSD"]
+doc-valid-idents = ["DragonflyBSD", "FreeBSD", "y_lo", "y_hi"]

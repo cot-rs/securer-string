@@ -253,8 +253,8 @@ mod tests {
             'a' as u32,
             'H' as u32,
         ]);
-        assert!(data1 == data2);
-        assert!(data1 != data3);
+        assert_eq!(data1, data2);
+        assert_ne!(data1, data3);
 
         let mut zeroed = data1.clone();
         zeroed.zero_out();
