@@ -1,7 +1,8 @@
 use core::fmt;
 use std::str::FromStr;
 
-use crate::{secure_utils::memlock, SecureVec};
+use crate::SecureVec;
+use crate::secure_utils::memlock;
 
 /// Wrapper for a vector that stores a valid UTF-8 string
 #[derive(Clone)]
@@ -9,9 +10,11 @@ pub struct SecureString(SecureVec<u8>);
 
 impl SecureString {
     /// Borrow the contents of the string.
+    #[must_use]
     pub fn unsecure(&self) -> &str {
-        // SAFETY: SecureString can only be constructed from valid UTF-8 (String or &str),
-        // and the contents cannot be modified as non-UTF-8, so they remain valid UTF-8.
+        // SAFETY: SecureString can only be constructed from valid UTF-8 (String or
+        // &str), and the contents cannot be modified as non-UTF-8, so they
+        // remain valid UTF-8.
         unsafe { std::str::from_utf8_unchecked(self.0.unsecure()) }
     }
 
@@ -22,6 +25,7 @@ impl SecureString {
     }
 
     /// Turn the string into a regular `String` again.
+    #[must_use]
     pub fn into_unsecure(mut self) -> String {
         memlock::munlock(self.0.content.as_mut_ptr(), self.0.content.capacity());
         let content = std::mem::take(&mut self.0.content);
@@ -30,11 +34,12 @@ impl SecureString {
         unsafe { String::from_utf8_unchecked(content) }
     }
 
-    /// Overwrite the string with zeros. This is automatically called in the destructor.
+    /// Overwrite the string with zeros. This is automatically called in the
+    /// destructor.
     ///
     /// This also sets the length to `0`.
     pub fn zero_out(&mut self) {
-        self.0.zero_out()
+        self.0.zero_out();
     }
 }
 

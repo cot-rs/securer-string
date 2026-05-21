@@ -1,27 +1,31 @@
 use core::fmt;
-use std::{
-    borrow::{Borrow, BorrowMut},
-    str::FromStr,
-};
+use std::borrow::{Borrow, BorrowMut};
+use std::str::FromStr;
 
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
 
-/// A data type suitable for storing sensitive information such as passwords and private keys in memory, that implements:
+/// A data type suitable for storing sensitive information such as passwords and
+/// private keys in memory, that implements:
 ///
 /// - Automatic zeroing in `Drop`
-/// - Constant time comparison in `PartialEq` (does not short circuit on the first different character; but terminates instantly if strings have different length)
-/// - Outputting `***SECRET***` to prevent leaking secrets into logs in `fmt::Debug` and `fmt::Display`
+/// - Constant time comparison in `PartialEq` (does not short circuit on the
+///   first different character; but terminates instantly if strings have
+///   different length)
+/// - Outputting `***SECRET***` to prevent leaking secrets into logs in
+///   `fmt::Debug` and `fmt::Display`
 /// - Automatic `mlock` to protect against leaking into swap (any unix)
-/// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
+/// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking
+///   into core dumps (FreeBSD, DragonflyBSD, Linux)
 ///
-/// `PartialEq` and `Eq` are only implemented when `T: ConstantTimeEq`. The safety of comparisons
-/// with respect to padding bytes depends on the `ConstantTimeEq` implementation of `T`.
+/// `PartialEq` and `Eq` are only implemented when `T: ConstantTimeEq`. The
+/// safety of comparisons with respect to padding bytes depends on the
+/// `ConstantTimeEq` implementation of `T`.
 ///
-/// Be careful with `SecureBytes::from`: if you have a borrowed string, it will be copied.
-/// Use `SecureBytes::new` if you have a `Vec<u8>`.
+/// Be careful with `SecureBytes::from`: if you have a borrowed string, it will
+/// be copied. Use `SecureBytes::new` if you have a `Vec<u8>`.
 pub struct SecureVec<T>
 where
     T: Copy + Zeroize,
@@ -36,12 +40,14 @@ impl<T> SecureVec<T>
 where
     T: Copy + Zeroize,
 {
+    #[must_use]
     pub fn new(mut cont: Vec<T>) -> Self {
         memlock::mlock(cont.as_mut_ptr(), cont.capacity());
         SecureVec { content: cont }
     }
 
     /// Borrow the contents of the string.
+    #[must_use]
     pub fn unsecure(&self) -> &[T] {
         self.borrow()
     }
@@ -54,9 +60,11 @@ where
     /// Resizes the `SecureVec` in-place so that len is equal to `new_len`.
     ///
     /// If `new_len` is smaller the inner vector is truncated.
-    /// If `new_len` is larger the inner vector will grow, placing `value` in all new cells.
+    /// If `new_len` is larger the inner vector will grow, placing `value` in
+    /// all new cells.
     ///
-    /// This ensures that the new memory region is secured if reallocation occurs.
+    /// This ensures that the new memory region is secured if reallocation
+    /// occurs.
     ///
     /// Similar to [`Vec::resize`](https://doc.rust-lang.org/std/vec/struct.Vec.html#method.resize)
     pub fn resize(&mut self, new_len: usize, value: T) {
@@ -77,11 +85,12 @@ where
         self.content = new_vec;
     }
 
-    /// Overwrite the string with zeros. This is automatically called in the destructor.
+    /// Overwrite the string with zeros. This is automatically called in the
+    /// destructor.
     ///
     /// This also sets the length to `0`.
     pub fn zero_out(&mut self) {
-        self.content.zeroize()
+        self.content.zeroize();
     }
 }
 
@@ -201,7 +210,8 @@ mod tests {
     fn test_zero_out() {
         let mut my_sec = SecureBytes::from("hello");
         my_sec.zero_out();
-        // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
+        // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were
+        // zeroed
         unsafe {
             my_sec.content.set_len(5);
         }
@@ -215,16 +225,19 @@ mod tests {
         my_sec.resize(1, 0);
         assert_eq!(my_sec.unsecure().len(), 1);
         my_sec.resize(16, 2);
-        assert_eq!(my_sec.unsecure(), &[0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]);
+        assert_eq!(
+            my_sec.unsecure(),
+            &[0, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+        );
     }
 
     #[test]
     fn test_comparison() {
         assert_eq!(SecureBytes::from("hello"), SecureBytes::from("hello"));
-        assert!(SecureBytes::from("hello") != SecureBytes::from("yolo"));
-        assert!(SecureBytes::from("hello") != SecureBytes::from("olleh"));
-        assert!(SecureBytes::from("hello") != SecureBytes::from("helloworld"));
-        assert!(SecureBytes::from("hello") != SecureBytes::from(""));
+        assert_ne!(SecureBytes::from("hello"), SecureBytes::from("yolo"));
+        assert_ne!(SecureBytes::from("hello"), SecureBytes::from("olleh"));
+        assert_ne!(SecureBytes::from("hello"), SecureBytes::from("helloworld"));
+        assert_ne!(SecureBytes::from("hello"), SecureBytes::from(""));
     }
 
     #[test]
@@ -236,8 +249,14 @@ mod tests {
 
     #[test]
     fn test_show() {
-        assert_eq!(format!("{:?}", SecureBytes::from("hello")), "***SECRET***".to_string());
-        assert_eq!(format!("{}", SecureBytes::from("hello")), "***SECRET***".to_string());
+        assert_eq!(
+            format!("{:?}", SecureBytes::from("hello")),
+            "***SECRET***".to_string()
+        );
+        assert_eq!(
+            format!("{}", SecureBytes::from("hello")),
+            "***SECRET***".to_string()
+        );
     }
 
     #[test]
@@ -272,12 +291,13 @@ mod tests {
             'a' as u32,
             'H' as u32,
         ]);
-        assert!(mbstring1 == mbstring2);
-        assert!(mbstring1 != mbstring3);
+        assert_eq!(mbstring1, mbstring2);
+        assert_ne!(mbstring1, mbstring3);
 
         let mut mbstring = mbstring1.clone();
         mbstring.zero_out();
-        // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
+        // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were
+        // zeroed
         unsafe {
             mbstring.content.set_len(8);
         }

@@ -1,93 +1,354 @@
-name: CI
+name: Rust CI
 
 on:
   push:
-    paths:
-      # Run if workflow changes
-      - ".github/workflows/ci.yml"
-      # Run on changed dependencies
-      - "**/Cargo.toml"
-      - "**/Cargo.lock"
-      - "**/rust-toolchain.toml"
-      # Run on changed source files
-      - "src/**"
-    branches: [main]
   pull_request:
-    branches: [main]
-  # Sometimes the rules above don't match even though they should.
-  # This allows us to run the workflow manually anyways.
   workflow_dispatch:
 
 env:
-  RUSTFLAGS: "-Dwarnings"
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+  _RUST_STABLE: &rust_stable stable
+  # Pinning the nightly version to a "stable" version to avoid CI breakages.
+  _RUST_NIGHTLY: &rust_nightly nightly-2026-02-28
+
+# See: https://docs.github.com/en/actions/reference/workflow-syntax-for-github-actions#concurrency.
+# This will ensure that only one commit will be running tests at a time on each PR.
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
 
 jobs:
-  rust_check:
-    name: Rust check
+  check:
+    # Run on external PRs and pushes to branches on the repo
+    # This is to avoid double running on PRs from internal branches
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    name: Cargo check
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: true
-      matrix:
-        features: ["", "--all-features"]
-
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout source
+        uses: actions/checkout@v6
 
-      - name: Install toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-
-      - name: cargo check
-        run: cargo check --lib --tests ${{matrix.features}}
-
-  rust_format:
-    name: Rust format
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: stable
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-ci"
+          cache-bin: "false"
+
+      - name: Run cargo check
+        run: cargo check --all-targets --all-features
+
+  build:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+    strategy:
+      matrix:
+        rust: [stable, nightly, MSRV]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - rust: stable
+            version: *rust_stable
+          - rust: nightly
+            version: *rust_nightly
+          - rust: MSRV
+            version: "1.88" # MSRV
+
+    name: Build & test
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.rust == 'nightly' }}
+    needs: ["check"]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.version }}
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-ci"
+          cache-bin: "false"
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - name: Fetch dependencies
+        run: cargo +${{ matrix.version }} fetch --locked
+
+      - name: Build
+        run: cargo +${{ matrix.version }} build --all-features --tests
+
+      - name: Test
+        run: cargo +${{ matrix.version }} nextest run --all-features
+
+      # Nextest does not support doc tests as in stable Rust
+      # they are not exposed in the same way as normal tests.
+      # https://github.com/nextest-rs/nextest/issues/16
+      - name: Test docs
+        run: cargo +${{ matrix.version }} test --all-features --doc
+
+  clippy:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    name: Clippy lint checks
+    runs-on: ubuntu-latest
+    needs: ["check"]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-ci"
+          cache-bin: "false"
+          save-if: "false"
+
+      - name: Run clippy
+        run: cargo clippy --no-deps --all-targets -- -D warnings
+
+  coverage:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    name: Test coverage checks
+    runs-on: ubuntu-latest
+    needs: ["build"]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Install LLVM
+        run: sudo apt-get install -y llvm
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: *rust_nightly
+          components: llvm-tools-preview
+
+      - name: Reclaim disk space
+        run: >
+          sudo rm -rf \
+              /opt/hostedtoolcache/CodeQL \
+              /usr/local/.ghcup \
+              /usr/local/lib/android \
+              /usr/local/lib/dotnet \
+              /usr/local/lib/swift
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-ci"
+          cache-bin: "false"
+          save-if: "false"
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      # TODO: consider enabling branch coverage once it's supported in stable
+      # https://github.com/taiki-e/cargo-llvm-cov/issues/8
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --workspace --no-report -- --include-ignored
+
+      - name: Generate code coverage - doctests
+        run: cargo llvm-cov --all-features --workspace --doc --no-report
+
+      - name: Merge code coverage reports
+        run: cargo llvm-cov report --codecov --output-path codecov.json
+
+      - uses: codecov/codecov-action@v6
+        with:
+          files: codecov.json
+          flags: rust
+          fail_ci_if_error: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  rustfmt:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    name: Code formatting checks
+    runs-on: ubuntu-latest
+    needs: ["check"]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          # nightly-only rustfmt settings
+          toolchain: *rust_nightly
           components: rustfmt
 
-      - name: cargo format
-        uses: actions-rust-lang/rustfmt@v1
-
-  rust_lint:
-    name: Rust lint
-    runs-on: ubuntu-latest
-    needs: ["rust_check", "rust_format"]
-
-    strategy:
-      fail-fast: true
-      matrix:
-        toolchain: ["stable", "beta", "nightly"]
-        features: ["", "--all-features"]
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Install toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
         with:
-          components: clippy
-          toolchain: ${{matrix.toolchain}}
+          shared-key: "rust-ci"
+          cache-bin: "false"
+          save-if: "false"
 
-      - name: cargo clippy
-        run: cargo clippy --lib --tests ${{matrix.features}}
+      - name: Run fmt
+        run: cargo fmt --all -- --check
 
-  rust_test:
-    name: Rust test
+  machete:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    name: Machete dependencies checks
     runs-on: ubuntu-latest
-    needs: ["rust_check", "rust_lint"]
-
+    needs: ["check"]
+    env:
+      RUSTC_WRAPPER: ""
+      SCCACHE_GHA_ENABLED: ""
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout source
+        uses: actions/checkout@v6
 
-      - name: Install toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
 
-      - name: cargo test
-        run: cargo test --all-features
+      - name: Run cargo-machete
+        uses: bnjbvr/cargo-machete@v0.9.2
+
+  minimal-versions:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    name: Minimal dependency versions build
+    runs-on: ubuntu-latest
+    needs: ["check"]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          # the `-Z` flag is only accepted on the nightly channel of Cargo
+          toolchain: *rust_nightly
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-ci"
+          cache-bin: "false"
+          save-if: "false"
+
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@cargo-hack
+
+      - name: Run cargo check with minimal versions
+        run: |
+          # Remove dev-dependencies from Cargo.toml to prevent the next `cargo update`
+          # from determining minimal versions based on dev-dependencies.
+          cargo hack --remove-dev-deps --workspace
+          # Update Cargo.lock to minimal version dependencies.
+          cargo update -Z minimal-versions
+          cargo hack check --all-features --ignore-private
+
+  miri:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    name: Miri test
+    runs-on: ubuntu-latest
+    needs: ["build"]
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          # miri requires nightly
+          toolchain: *rust_nightly
+          components: miri
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-ci"
+          cache-bin: "false"
+          save-if: "false"
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nextest
+
+      - name: Miri setup
+        run: cargo miri setup
+
+      - name: Miri test
+        run: cargo miri nextest run --no-fail-fast --all-features
+        env:
+          MIRIFLAGS: -Zmiri-disable-isolation
+
+  cargo-deny:
+    if: github.event_name == 'push' || github.event_name == 'schedule' || github.event.pull_request.head.repo.full_name != github.repository
+
+    name: License check
+    runs-on: ubuntu-latest
+    env:
+      SCCACHE_GHA_ENABLED: ""
+      RUSTC_WRAPPER: ""
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+      - name: Check licenses
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          log-level: warn
+          command: check licenses
+          command-arguments: --config .cargo/deny.toml
+
+  semver-check:
+    if: github.event_name == 'pull_request'
+    name: Semver compatibility check
+    runs-on: ubuntu-latest
+    env:
+      RUSTC_WRAPPER: ""
+      SCCACHE_GHA_ENABLED: ""
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+
+      - name: Cache Cargo registry
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "rust-ci"
+          cache-bin: "false"
+          save-if: "false"
+
+      - name: Run cargo-semver-checks
+        uses: obi1kenobi/cargo-semver-checks-action@v2.9
+        with:
+          rust-toolchain: manual
+          baseline-rev: ${{ github.event.pull_request.base.sha }}
+          shared-key: "rust-ci"
+          feature-group: all-features
+          verbose: true

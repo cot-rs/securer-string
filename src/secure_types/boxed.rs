@@ -1,22 +1,24 @@
 use core::fmt;
-use std::{
-    borrow::{Borrow, BorrowMut},
-    mem::MaybeUninit,
-};
+use std::borrow::{Borrow, BorrowMut};
+use std::mem::MaybeUninit;
 
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
 
-/// A data type suitable for storing sensitive information such as passwords and private keys in memory, that implements:
+/// A data type suitable for storing sensitive information such as passwords and
+/// private keys in memory, that implements:
 ///
 /// - Automatic zeroing in `Drop`
-/// - Constant time comparison in `PartialEq` (does not short circuit on the first different character; but terminates instantly if strings have different length)
-/// - Outputting `***SECRET***` to prevent leaking secrets into logs in `fmt::Debug` and `fmt::Display`
+/// - Constant time comparison in `PartialEq` (does not short circuit on the
+///   first different character; but terminates instantly if strings have
+///   different length)
+/// - Outputting `***SECRET***` to prevent leaking secrets into logs in
+///   `fmt::Debug` and `fmt::Display`
 /// - Automatic `mlock` to protect against leaking into swap (any unix)
-/// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
-///
+/// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking
+///   into core dumps (FreeBSD, DragonflyBSD, Linux)
 pub struct SecureBox<T>
 where
     T: Copy,
@@ -30,19 +32,35 @@ impl<T> SecureBox<T>
 where
     T: Copy,
 {
+    #[must_use]
     pub fn new(mut cont: Box<T>) -> Self {
-        memlock::mlock(&mut *cont, 1);
-        SecureBox { content: Some(cont) }
+        memlock::mlock(&raw mut *cont, 1);
+        SecureBox {
+            content: Some(cont),
+        }
     }
 
     /// Borrow the contents of the string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the content has already been dropped.
+    #[must_use]
     pub fn unsecure(&self) -> &T {
-        self.content.as_deref().expect("SecureBox content accessed after drop")
+        self.content
+            .as_deref()
+            .expect("SecureBox content accessed after drop")
     }
 
     /// Mutably borrow the contents of the string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the content has already been dropped.
     pub fn unsecure_mut(&mut self) -> &mut T {
-        self.content.as_deref_mut().expect("SecureBox content accessed after drop")
+        self.content
+            .as_deref_mut()
+            .expect("SecureBox content accessed after drop")
     }
 }
 
@@ -102,20 +120,25 @@ where
     T: Copy,
 {
     fn drop(&mut self) {
-        // Make sure that the box does not need to be dropped after this function, because it may
-        // see an invalid type, if `T` does not support an all-zero byte-pattern
-        // Instead we manually destruct the box and only handle the potentially invalid values
-        // behind the pointer
+        // Make sure that the box does not need to be dropped after this function,
+        // because it may see an invalid type, if `T` does not support an
+        // all-zero byte-pattern Instead we manually destruct the box and only
+        // handle the potentially invalid values behind the pointer
         let ptr = Box::into_raw(self.content.take().expect("SecureBox dropped twice"));
 
-        // There is no need to worry about dropping the contents, because `T: Copy` and `Copy`
-        // types cannot implement `Drop`
+        // There is no need to worry about dropping the contents, because `T: Copy` and
+        // `Copy` types cannot implement `Drop`
 
-        // SAFETY: `ptr` was just obtained from `Box::into_raw` so it is valid, aligned, and
-        // points to `size_of::<T>()` allocated bytes. Writing `MaybeUninit<u8>` zeros is always
-        // valid regardless of `T`'s invariants.
+        // SAFETY: `ptr` was just obtained from `Box::into_raw` so it is valid, aligned,
+        // and points to `size_of::<T>()` allocated bytes. Writing
+        // `MaybeUninit<u8>` zeros is always valid regardless of `T`'s
+        // invariants.
         unsafe {
-            std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(ptr as *mut MaybeUninit<u8>, std::mem::size_of::<T>()).zeroize();
+            std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(
+                ptr.cast::<MaybeUninit<u8>>(),
+                std::mem::size_of::<T>(),
+            )
+            .zeroize();
         }
 
         memlock::munlock(ptr, 1);
@@ -123,9 +146,10 @@ where
         // Deallocate only non-zero-sized types, because otherwise it's UB
         if std::mem::size_of::<T>() != 0 {
             // SAFETY: This way to manually deallocate is advertised in the documentation of
-            // `Box::into_raw`. The box was allocated with the global allocator and a layout of
-            // `T` and is thus deallocated using the same allocator and layout here.
-            unsafe { std::alloc::dealloc(ptr as *mut u8, std::alloc::Layout::new::<T>()) };
+            // `Box::into_raw`. The box was allocated with the global allocator and a layout
+            // of `T` and is thus deallocated using the same allocator and
+            // layout here.
+            unsafe { std::alloc::dealloc(ptr.cast::<u8>(), std::alloc::Layout::new::<T>()) };
         }
     }
 }
@@ -156,25 +180,27 @@ mod tests {
     use zeroize::Zeroize;
 
     use super::SecureBox;
-    use crate::test_utils::{Packed, Padded, PRIVATE_KEY_1, PRIVATE_KEY_2};
+    use crate::test_utils::{PRIVATE_KEY_1, PRIVATE_KEY_2, Packed, Padded};
 
     /// Overwrite the contents with zeros.
     ///
     /// # Safety
-    /// An all-zero byte-pattern must be a valid value of `T` in order for this function call to not be
-    /// undefined behavior.
+    /// An all-zero byte-pattern must be a valid value of `T` in order for this
+    /// function call to not be undefined behavior.
     unsafe fn zero_out_secure_box<T>(secure_box: &mut SecureBox<T>)
     where
         T: Copy,
     {
-        // SAFETY: The pointer is derived from a live `Box<T>` via mutable reference, so it is
-        // valid and aligned for `size_of::<T>()` bytes. The caller guarantees that an all-zero
-        // byte-pattern is a valid value of `T`.
-        std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(
-            secure_box.unsecure_mut() as *mut T as *mut MaybeUninit<u8>,
-            std::mem::size_of::<T>(),
-        )
-        .zeroize();
+        unsafe {
+            // SAFETY: The pointer is derived from a live `Box<T>` via mutable reference, so
+            // it is valid and aligned for `size_of::<T>()` bytes. The caller
+            // guarantees that an all-zero byte-pattern is a valid value of `T`.
+            std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(
+                std::ptr::from_mut::<T>(secure_box.unsecure_mut()).cast::<MaybeUninit<u8>>(),
+                std::mem::size_of::<T>(),
+            )
+            .zeroize();
+        }
     }
 
     #[test]
@@ -182,10 +208,10 @@ mod tests {
         let key_1 = SecureBox::new(Box::new(PRIVATE_KEY_1));
         let key_2 = SecureBox::new(Box::new(PRIVATE_KEY_2));
         let key_3 = SecureBox::new(Box::new(PRIVATE_KEY_1));
-        assert!(key_1 == key_1);
-        assert!(key_1 != key_2);
-        assert!(key_2 != key_3);
-        assert!(key_1 == key_3);
+        assert_eq!(key_1, key_1);
+        assert_ne!(key_1, key_2);
+        assert_ne!(key_2, key_3);
+        assert_eq!(key_1, key_3);
 
         let mut final_key = key_1.clone();
         unsafe {
