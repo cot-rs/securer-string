@@ -17,7 +17,7 @@ impl SecureString {
 
     /// Mutably borrow the contents of the string.
     pub fn unsecure_mut(&mut self) -> &mut str {
-        // SAFETY: Same as `unsecure` — contents are always valid UTF-8.
+        // SAFETY: Same as `unsecure` - contents are always valid UTF-8.
         unsafe { std::str::from_utf8_unchecked_mut(self.0.unsecure_mut()) }
     }
 
@@ -26,7 +26,7 @@ impl SecureString {
         memlock::munlock(self.0.content.as_mut_ptr(), self.0.content.capacity());
         let content = std::mem::take(&mut self.0.content);
         std::mem::forget(self);
-        // SAFETY: Same as `unsecure` — contents are always valid UTF-8.
+        // SAFETY: Same as `unsecure` - contents are always valid UTF-8.
         unsafe { String::from_utf8_unchecked(content) }
     }
 

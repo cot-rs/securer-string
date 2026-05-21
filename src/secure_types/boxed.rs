@@ -31,38 +31,30 @@ where
     T: Copy,
 {
     pub fn new(mut cont: Box<T>) -> Self {
-        memlock::mlock(&mut cont, 1);
+        memlock::mlock(&mut *cont, 1);
         SecureBox { content: Some(cont) }
-    }
-
-    fn content_ref(&self) -> &T {
-        self.content.as_deref().expect("SecureBox content accessed after drop")
-    }
-
-    fn content_mut(&mut self) -> &mut T {
-        self.content.as_deref_mut().expect("SecureBox content accessed after drop")
     }
 
     /// Borrow the contents of the string.
     pub fn unsecure(&self) -> &T {
-        self.content_ref()
+        self.content.as_deref().expect("SecureBox content accessed after drop")
     }
 
     /// Mutably borrow the contents of the string.
     pub fn unsecure_mut(&mut self) -> &mut T {
-        self.content_mut()
+        self.content.as_deref_mut().expect("SecureBox content accessed after drop")
     }
 }
 
 impl<T: Copy> Clone for SecureBox<T> {
     fn clone(&self) -> Self {
-        Self::new(Box::new(*self.content_ref()))
+        Self::new(Box::new(*self.unsecure()))
     }
 }
 
 impl<T: Copy + ConstantTimeEq> ConstantTimeEq for SecureBox<T> {
     fn ct_eq(&self, other: &Self) -> subtle::Choice {
-        self.content_ref().ct_eq(other.content_ref())
+        self.unsecure().ct_eq(other.unsecure())
     }
 }
 
@@ -82,7 +74,7 @@ where
     type Output = <T as std::ops::Index<U>>::Output;
 
     fn index(&self, index: U) -> &Self::Output {
-        std::ops::Index::index(self.content_ref(), index)
+        std::ops::Index::index(self.unsecure(), index)
     }
 }
 
@@ -92,7 +84,7 @@ where
     T: Copy,
 {
     fn borrow(&self) -> &T {
-        self.content_ref()
+        self.unsecure()
     }
 }
 impl<T> BorrowMut<T> for SecureBox<T>
@@ -100,7 +92,7 @@ where
     T: Copy,
 {
     fn borrow_mut(&mut self) -> &mut T {
-        self.content_mut()
+        self.unsecure_mut()
     }
 }
 
@@ -179,7 +171,7 @@ mod tests {
         // valid and aligned for `size_of::<T>()` bytes. The caller guarantees that an all-zero
         // byte-pattern is a valid value of `T`.
         std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(
-            secure_box.content_mut() as *mut T as *mut MaybeUninit<u8>,
+            secure_box.unsecure_mut() as *mut T as *mut MaybeUninit<u8>,
             std::mem::size_of::<T>(),
         )
         .zeroize();

@@ -97,7 +97,9 @@ impl<const LENGTH: usize> Serialize for SecureArray<u8, LENGTH> {
 
 #[cfg(test)]
 mod tests {
-    use crate::SecureVec;
+    use serde::Deserialize;
+
+    use crate::{SecureArray, SecureVec};
 
     #[test]
     fn test_serde_json() {
@@ -109,5 +111,20 @@ mod tests {
         let secure_bytes_serde: SecureVec<u8> = serde_json::from_str(&json).unwrap();
 
         assert_eq!(secure_bytes, secure_bytes_serde);
+    }
+
+    #[test]
+    fn test_serde_visit_bytes() {
+        let de = serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(b"abc");
+        let result = SecureVec::<u8>::deserialize(de).unwrap();
+        assert_eq!(result.unsecure(), b"abc");
+    }
+
+    #[test]
+    fn test_serde_array() {
+        let data: SecureArray<u8, 3> = SecureArray::from(*b"abc");
+        let json = serde_json::to_string(&data).unwrap();
+        let result: SecureArray<u8, 3> = serde_json::from_str(&json).unwrap();
+        assert_eq!(data, result);
     }
 }

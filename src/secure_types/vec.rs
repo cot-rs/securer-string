@@ -17,7 +17,8 @@ use crate::secure_utils::memlock;
 /// - Automatic `mlock` to protect against leaking into swap (any unix)
 /// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
 ///
-/// Comparisons using the `PartialEq` implementation are undefined behavior (and most likely wrong) if `T` has any padding bytes.
+/// `PartialEq` and `Eq` are only implemented when `T: ConstantTimeEq`. The safety of comparisons
+/// with respect to padding bytes depends on the `ConstantTimeEq` implementation of `T`.
 ///
 /// Be careful with `SecureBytes::from`: if you have a borrowed string, it will be copied.
 /// Use `SecureBytes::new` if you have a `Vec<u8>`.
@@ -243,11 +244,11 @@ mod tests {
 
     #[test]
     fn test_comparison_zero_out_mb() {
-        let mbstring1 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-        let mbstring2 = SecureVec::from(vec!['H', 'a', 'l', 'l', 'o', ' ', '🦄', '!']);
-        let mbstring3 = SecureVec::from(vec!['!', '🦄', ' ', 'o', 'l', 'l', 'a', 'H']);
-        assert_eq!(mbstring1.unsecure(), mbstring2.unsecure());
-        assert_ne!(mbstring1.unsecure(), mbstring3.unsecure());
+        let mbstring1 = SecureVec::from(vec!['H' as u32, 'a' as u32, 'l' as u32, 'l' as u32, 'o' as u32, ' ' as u32, '🦄' as u32, '!' as u32]);
+        let mbstring2 = SecureVec::from(vec!['H' as u32, 'a' as u32, 'l' as u32, 'l' as u32, 'o' as u32, ' ' as u32, '🦄' as u32, '!' as u32]);
+        let mbstring3 = SecureVec::from(vec!['!' as u32, '🦄' as u32, ' ' as u32, 'o' as u32, 'l' as u32, 'l' as u32, 'a' as u32, 'H' as u32]);
+        assert!(mbstring1 == mbstring2);
+        assert!(mbstring1 != mbstring3);
 
         let mut mbstring = mbstring1.clone();
         mbstring.zero_out();
@@ -257,6 +258,6 @@ mod tests {
         unsafe {
             mbstring.content.set_len(8);
         }
-        assert_eq!(mbstring.unsecure(), &['\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0']);
+        assert_eq!(mbstring.unsecure(), &[0u32; 8]);
     }
 }

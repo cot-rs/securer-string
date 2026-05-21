@@ -203,9 +203,9 @@ mod tests {
 
     #[test]
     fn test_comparison_zero_out_multibyte() {
-        let data1 = SecureArray::from([0x0048u32, 0x0061, 0x006C, 0x006C, 0x006F, 0x0020, 0x1F984, 0x0021]);
-        let data2 = SecureArray::from([0x0048u32, 0x0061, 0x006C, 0x006C, 0x006F, 0x0020, 0x1F984, 0x0021]);
-        let data3 = SecureArray::from([0x0021u32, 0x1F984, 0x0020, 0x006F, 0x006C, 0x006C, 0x0061, 0x0048]);
+        let data1 = SecureArray::from(['H' as u32, 'a' as u32, 'l' as u32, 'l' as u32, 'o' as u32, ' ' as u32, '🦄' as u32, '!' as u32]);
+        let data2 = SecureArray::from(['H' as u32, 'a' as u32, 'l' as u32, 'l' as u32, 'o' as u32, ' ' as u32, '🦄' as u32, '!' as u32]);
+        let data3 = SecureArray::from(['!' as u32, '🦄' as u32, ' ' as u32, 'o' as u32, 'l' as u32, 'l' as u32, 'a' as u32, 'H' as u32]);
         assert!(data1 == data2);
         assert!(data1 != data3);
 
