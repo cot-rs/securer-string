@@ -1,8 +1,8 @@
 use core::fmt;
 use std::str::FromStr;
 
-use crate::secure_utils::memlock;
 use crate::SecureVec;
+use crate::secure_utils::memlock;
 
 /// Wrapper for a vector that stores a valid UTF-8 string
 #[derive(Clone)]

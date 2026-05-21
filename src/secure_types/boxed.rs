@@ -170,7 +170,7 @@ mod tests {
     use zeroize::Zeroize;
 
     use super::SecureBox;
-    use crate::test_utils::{Packed, Padded, PRIVATE_KEY_1, PRIVATE_KEY_2};
+    use crate::test_utils::{PRIVATE_KEY_1, PRIVATE_KEY_2, Packed, Padded};
 
     /// Overwrite the contents with zeros.
     ///

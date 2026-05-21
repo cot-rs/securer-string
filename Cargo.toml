@@ -1,14 +1,17 @@
 [package]
-name = "secure-string"
-version = "0.3.0"
-authors = ["Sebastian Schmidt <isibboi@gmail.com>"]
+name = "securer-string"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/cot-rs/securer-string"
+readme = "README.md"
+authors = [
+    "Mateusz Maćkowski <mateusz@mackowski.org>",
+    "Marek Grzelak <marek.grzelak@seqre.dev>",
+]
 keywords = ["Security", "Memory"]
 description = "A data type suitable for storing sensitive information such as passwords and private keys in memory, featuring constant time equality, mlock and zeroing out."
-license = "Unlicense"
-readme = "README.md"
-repository = "https://github.com/ISibboI/secure-string"
-documentation = "https://docs.rs/secure-string/"
-edition = "2021"
 
 [dependencies]
 libc = "0.2"
