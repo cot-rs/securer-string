@@ -97,27 +97,9 @@ impl<const LENGTH: usize> Serialize for SecureArray<u8, LENGTH> {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use serde::Deserialize;
 
-    use crate::{SecureArray, SecureBytes, SecureVec};
-
-    #[test]
-    fn test_cbor_vec() {
-        let data = SecureBytes::from("hello");
-        let cbor = serde_cbor::to_vec(&data).unwrap();
-        assert_eq!(cbor, b"\x45hello");
-        let deserialised = serde_cbor::from_slice(&cbor).unwrap();
-        assert_eq!(data, deserialised);
-    }
-
-    #[test]
-    fn test_cbor_array() {
-        let data: SecureArray<_, 5> = SecureArray::from_str("hello").unwrap();
-        let cbor = serde_cbor::to_vec(&data).unwrap();
-        assert_eq!(cbor, b"\x45hello");
-        let deserialised = serde_cbor::from_slice(&cbor).unwrap();
-        assert_eq!(data, deserialised);
-    }
+    use crate::{SecureArray, SecureVec};
 
     #[test]
     fn test_serde_json() {
@@ -129,5 +111,20 @@ mod tests {
         let secure_bytes_serde: SecureVec<u8> = serde_json::from_str(&json).unwrap();
 
         assert_eq!(secure_bytes, secure_bytes_serde);
+    }
+
+    #[test]
+    fn test_serde_visit_bytes() {
+        let de = serde::de::value::BytesDeserializer::<serde::de::value::Error>::new(b"abc");
+        let result = SecureVec::<u8>::deserialize(de).unwrap();
+        assert_eq!(result.unsecure(), b"abc");
+    }
+
+    #[test]
+    fn test_serde_array() {
+        let data: SecureArray<u8, 3> = SecureArray::from(*b"abc");
+        let json = serde_json::to_string(&data).unwrap();
+        let result: SecureArray<u8, 3> = serde_json::from_str(&json).unwrap();
+        assert_eq!(data, result);
     }
 }

@@ -4,6 +4,9 @@ pub mod memlock {
 
     pub fn mlock<T>(cont: *mut T, count: usize) {
         let byte_num = count * std::mem::size_of::<T>();
+        // SAFETY: `cont` points to a valid allocation of at least `count * size_of::<T>()`
+        // bytes (guaranteed by callers passing pointers from live Vec/Array/Box allocations).
+        // mlock/madvise are safe to call on any valid memory region.
         unsafe {
             let ptr = cont as *mut libc::c_void;
             libc::mlock(ptr, byte_num);
@@ -16,6 +19,8 @@ pub mod memlock {
 
     pub fn munlock<T>(cont: *mut T, count: usize) {
         let byte_num = count * std::mem::size_of::<T>();
+        // SAFETY: Same as `mlock` - the pointer is to a valid allocation that was previously
+        // locked. munlock/madvise are safe to call on any valid memory region.
         unsafe {
             let ptr = cont as *mut libc::c_void;
             libc::munlock(ptr, byte_num);
