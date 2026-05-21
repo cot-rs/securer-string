@@ -167,6 +167,9 @@ mod tests {
     where
         T: Copy,
     {
+        // SAFETY: The pointer is derived from a live `Box<T>` via mutable reference, so it is
+        // valid and aligned for `size_of::<T>()` bytes. The caller guarantees that an all-zero
+        // byte-pattern is a valid value of `T`.
         std::slice::from_raw_parts_mut::<MaybeUninit<u8>>(
             secure_box.unsecure_mut() as *mut T as *mut MaybeUninit<u8>,
             std::mem::size_of::<T>(),
