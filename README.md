@@ -53,6 +53,9 @@ Use `SecureString::new` if you have a `Vec<u8>`.
 
 Made with [contrib.rocks](https://contrib.rocks).
 
+## Acknowledgments
+
+This crate was forked from [`secure-string`](https://crates.io/crates/secure-string), which was based on [`secstr`](https://crates.io/crates/secstr).
 
 ## License
 
