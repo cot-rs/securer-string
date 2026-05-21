@@ -242,9 +242,36 @@ mod tests {
 
     #[test]
     fn test_comparison_zero_out_mb() {
-        let mbstring1 = SecureVec::from(vec!['H' as u32, 'a' as u32, 'l' as u32, 'l' as u32, 'o' as u32, ' ' as u32, '🦄' as u32, '!' as u32]);
-        let mbstring2 = SecureVec::from(vec!['H' as u32, 'a' as u32, 'l' as u32, 'l' as u32, 'o' as u32, ' ' as u32, '🦄' as u32, '!' as u32]);
-        let mbstring3 = SecureVec::from(vec!['!' as u32, '🦄' as u32, ' ' as u32, 'o' as u32, 'l' as u32, 'l' as u32, 'a' as u32, 'H' as u32]);
+        let mbstring1 = SecureVec::from(vec![
+            'H' as u32,
+            'a' as u32,
+            'l' as u32,
+            'l' as u32,
+            'o' as u32,
+            ' ' as u32,
+            '🦄' as u32,
+            '!' as u32,
+        ]);
+        let mbstring2 = SecureVec::from(vec![
+            'H' as u32,
+            'a' as u32,
+            'l' as u32,
+            'l' as u32,
+            'o' as u32,
+            ' ' as u32,
+            '🦄' as u32,
+            '!' as u32,
+        ]);
+        let mbstring3 = SecureVec::from(vec![
+            '!' as u32,
+            '🦄' as u32,
+            ' ' as u32,
+            'o' as u32,
+            'l' as u32,
+            'l' as u32,
+            'a' as u32,
+            'H' as u32,
+        ]);
         assert!(mbstring1 == mbstring2);
         assert!(mbstring1 != mbstring3);
 
