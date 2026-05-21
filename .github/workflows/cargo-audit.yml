@@ -1,29 +1,24 @@
-name: "Audit Dependencies"
+name: Security audit
+
 on:
   push:
     paths:
-      # Run if workflow changes
-      - '.github/workflows/cargo-audit.yml'
-      # Run on changed dependencies
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      # Run if the configuration file changes
-      - '**/audit.toml'
-  # Rerun periodicly to pick up new advisories
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - ".github/workflows/audit.yml"
   schedule:
-    - cron: '0 0 * * *'
-  # Run manually
-  workflow_dispatch:
-
-permissions: read-all
+    - cron: "0 0 * * *"
 
 jobs:
-  audit:
-    name: "Cargo audit"
+  security_audit:
+    name: Audit check
     runs-on: ubuntu-latest
     permissions:
+      checks: write
+      contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions-rust-lang/audit@v1
-        name: Audit Dependencies
+      - uses: actions/checkout@v6
+      - uses: rustsec/audit-check@v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
