@@ -1,10 +1,9 @@
 use core::fmt;
-use std::{borrow::Borrow, marker::PhantomData};
+use std::borrow::Borrow;
+use std::marker::PhantomData;
 
-use serde::{
-    de::{self, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{SecureArray, SecureVec};
 
@@ -14,7 +13,9 @@ struct BytesVisitor<Value> {
 
 impl<Value> Default for BytesVisitor<Value> {
     fn default() -> Self {
-        Self { phandom_data: Default::default() }
+        Self {
+            phandom_data: Default::default(),
+        }
     }
 }
 
@@ -32,16 +33,22 @@ where
     where
         E: de::Error,
     {
-        Self::Value::try_from(value.to_vec())
-            .map_err(|error| serde::de::Error::custom(format!("cannot construct secure value from byte slice: {error}")))
+        Self::Value::try_from(value.to_vec()).map_err(|error| {
+            serde::de::Error::custom(format!(
+                "cannot construct secure value from byte slice: {error}"
+            ))
+        })
     }
 
     fn visit_byte_buf<E>(self, value: Vec<u8>) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        Self::Value::try_from(value)
-            .map_err(|error| serde::de::Error::custom(format!("cannot construct secure value from byte vector: {error}")))
+        Self::Value::try_from(value).map_err(|error| {
+            serde::de::Error::custom(format!(
+                "cannot construct secure value from byte vector: {error}"
+            ))
+        })
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -54,8 +61,11 @@ where
             value.push(element);
         }
 
-        Self::Value::try_from(value)
-            .map_err(|error| serde::de::Error::custom(format!("cannot construct secure value from byte sequence: {error}")))
+        Self::Value::try_from(value).map_err(|error| {
+            serde::de::Error::custom(format!(
+                "cannot construct secure value from byte sequence: {error}"
+            ))
+        })
     }
 }
 

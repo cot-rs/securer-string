@@ -1,7 +1,0 @@
-max_width = 128
-fn_call_width = 96
-struct_lit_width = 64
-struct_variant_width = 96
-newline_style = "Native"
-use_try_shorthand = true
-match_block_trailing_comma = true

@@ -1,22 +1,24 @@
 use core::fmt;
-use std::{
-    borrow::{Borrow, BorrowMut},
-    str::FromStr,
-};
+use std::borrow::{Borrow, BorrowMut};
+use std::str::FromStr;
 
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::secure_utils::memlock;
 
-/// A data type suitable for storing sensitive information such as passwords and private keys in memory, that implements:
+/// A data type suitable for storing sensitive information such as passwords and
+/// private keys in memory, that implements:
 ///
 /// - Automatic zeroing in `Drop`
-/// - Constant time comparison in `PartialEq` (does not short circuit on the first different character; but terminates instantly if strings have different length)
-/// - Outputting `***SECRET***` to prevent leaking secrets into logs in `fmt::Debug` and `fmt::Display`
+/// - Constant time comparison in `PartialEq` (does not short circuit on the
+///   first different character; but terminates instantly if strings have
+///   different length)
+/// - Outputting `***SECRET***` to prevent leaking secrets into logs in
+///   `fmt::Debug` and `fmt::Display`
 /// - Automatic `mlock` to protect against leaking into swap (any unix)
-/// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking into core dumps (FreeBSD, DragonflyBSD, Linux)
-///
+/// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking
+///   into core dumps (FreeBSD, DragonflyBSD, Linux)
 pub struct SecureArray<T, const LENGTH: usize>
 where
     T: Copy + Zeroize,
@@ -43,7 +45,8 @@ where
         self.borrow_mut()
     }
 
-    /// Overwrite the string with zeros. This is automatically called in the destructor.
+    /// Overwrite the string with zeros. This is automatically called in the
+    /// destructor.
     pub fn zero_out(&mut self) {
         self.content.zeroize()
     }
@@ -55,7 +58,9 @@ impl<T: Copy + Zeroize, const LENGTH: usize> Clone for SecureArray<T, LENGTH> {
     }
 }
 
-impl<T: Copy + Zeroize + ConstantTimeEq, const LENGTH: usize> ConstantTimeEq for SecureArray<T, LENGTH> {
+impl<T: Copy + Zeroize + ConstantTimeEq, const LENGTH: usize> ConstantTimeEq
+    for SecureArray<T, LENGTH>
+{
     fn ct_eq(&self, other: &Self) -> subtle::Choice {
         self.content.as_slice().ct_eq(other.content.as_slice())
     }
@@ -87,7 +92,10 @@ where
 
     fn try_from(s: Vec<T>) -> Result<Self, Self::Error> {
         Ok(Self::new(s.try_into().map_err(|error: Vec<T>| {
-            format!("length mismatch: expected {LENGTH}, but got {}", error.len())
+            format!(
+                "length mismatch: expected {LENGTH}, but got {}",
+                error.len()
+            )
         })?))
     }
 }
@@ -184,8 +192,14 @@ mod tests {
 
     #[test]
     fn test_comparison() {
-        assert_eq!(SecureArray::<_, 5>::from_str("hello").unwrap(), SecureArray::from_str("hello").unwrap());
-        assert_ne!(SecureArray::<_, 5>::from_str("hello").unwrap(), SecureArray::from_str("olleh").unwrap());
+        assert_eq!(
+            SecureArray::<_, 5>::from_str("hello").unwrap(),
+            SecureArray::from_str("hello").unwrap()
+        );
+        assert_ne!(
+            SecureArray::<_, 5>::from_str("hello").unwrap(),
+            SecureArray::from_str("olleh").unwrap()
+        );
     }
 
     #[test]
@@ -197,8 +211,14 @@ mod tests {
 
     #[test]
     fn test_show() {
-        assert_eq!(format!("{:?}", SecureArray::<_, 5>::from_str("hello").unwrap()), "***SECRET***".to_string());
-        assert_eq!(format!("{}", SecureArray::<_, 5>::from_str("hello").unwrap()), "***SECRET***".to_string());
+        assert_eq!(
+            format!("{:?}", SecureArray::<_, 5>::from_str("hello").unwrap()),
+            "***SECRET***".to_string()
+        );
+        assert_eq!(
+            format!("{}", SecureArray::<_, 5>::from_str("hello").unwrap()),
+            "***SECRET***".to_string()
+        );
     }
 
     #[test]
