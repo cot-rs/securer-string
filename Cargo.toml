@@ -10,7 +10,7 @@ authors = [
     "Mateusz Maćkowski <mateusz@mackowski.org>",
     "Marek Grzelak <marek.grzelak@seqre.dev>",
 ]
-keywords = ["Security", "Memory"]
+keywords = ["security", "memory", "secret", "password"]
 description = "A data type suitable for storing sensitive information such as passwords and private keys in memory, featuring constant time equality, mlock and zeroing out."
 
 [lints.clippy]
