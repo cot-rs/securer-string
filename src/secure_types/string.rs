@@ -54,7 +54,7 @@ impl Eq for SecureString {}
 
 impl fmt::Debug for SecureString {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("***SECRET***").map_err(|_| fmt::Error)
+        f.debug_struct("SecureString").finish_non_exhaustive()
     }
 }
 

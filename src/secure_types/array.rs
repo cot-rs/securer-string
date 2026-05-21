@@ -157,7 +157,7 @@ where
     T: Copy + Zeroize,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("***SECRET***").map_err(|_| fmt::Error)
+        f.debug_struct("SecureArray").finish_non_exhaustive()
     }
 }
 
@@ -213,7 +213,7 @@ mod tests {
     fn test_show() {
         assert_eq!(
             format!("{:?}", SecureArray::<_, 5>::from_str("hello").unwrap()),
-            "***SECRET***".to_string()
+            "SecureArray { .. }".to_string()
         );
         assert_eq!(
             format!("{}", SecureArray::<_, 5>::from_str("hello").unwrap()),

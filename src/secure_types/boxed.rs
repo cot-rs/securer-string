@@ -160,7 +160,7 @@ where
     T: Copy,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("***SECRET***").map_err(|_| fmt::Error)
+        f.debug_struct("SecureBox").finish_non_exhaustive()
     }
 }
 
