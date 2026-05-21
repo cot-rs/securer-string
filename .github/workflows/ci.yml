@@ -84,7 +84,7 @@ jobs:
           tool: nextest
 
       - name: Fetch dependencies
-        run: cargo +${{ matrix.version }} fetch --locked
+        run: cargo +${{ matrix.version }} fetch
 
       - name: Build
         run: cargo +${{ matrix.version }} build --all-features --tests
