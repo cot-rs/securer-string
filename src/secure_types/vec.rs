@@ -202,8 +202,6 @@ mod tests {
         let mut my_sec = SecureBytes::from("hello");
         my_sec.zero_out();
         // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-        // SAFETY: capacity is still >= 5 (zero_out does not shrink), and all 5 bytes were
-        // zeroed, so they are valid initialized `u8` values.
         unsafe {
             my_sec.content.set_len(5);
         }
@@ -253,8 +251,6 @@ mod tests {
         let mut mbstring = mbstring1.clone();
         mbstring.zero_out();
         // `zero_out` sets the `len` to 0, here we reset it to check that the bytes were zeroed
-        // SAFETY: capacity is still >= 8 (zero_out does not shrink), and all bytes were
-        // zeroed, which is a valid bit pattern for `u32`.
         unsafe {
             mbstring.content.set_len(8);
         }
