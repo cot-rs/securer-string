@@ -182,7 +182,7 @@ where
     T: Copy + Zeroize,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str("***SECRET***").map_err(|_| fmt::Error)
+        f.debug_struct("SecureVec").finish_non_exhaustive()
     }
 }
 
@@ -251,7 +251,7 @@ mod tests {
     fn test_show() {
         assert_eq!(
             format!("{:?}", SecureBytes::from("hello")),
-            "***SECRET***".to_string()
+            "SecureVec { .. }".to_string()
         );
         assert_eq!(
             format!("{}", SecureBytes::from("hello")),
