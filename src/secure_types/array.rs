@@ -5,7 +5,7 @@ use std::str::FromStr;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
-use crate::secure_utils::memlock;
+use crate::SecureBox;
 
 /// A data type suitable for storing sensitive information such as passwords and
 /// private keys in memory, that implements:
@@ -19,29 +19,36 @@ use crate::secure_utils::memlock;
 /// - Automatic `mlock` to protect against leaking into swap (any unix)
 /// - Automatic `madvise(MADV_NOCORE/MADV_DONTDUMP)` to protect against leaking
 ///   into core dumps (FreeBSD, DragonflyBSD, Linux)
+///
+/// The contents are stored on the heap (via [`SecureBox`]) so the locked memory
+/// region has a stable address: moving the `SecureArray` only moves the
+/// pointer, keeping the `mlock` valid.
 pub struct SecureArray<T, const LENGTH: usize>
 where
     T: Copy + Zeroize,
 {
-    pub(crate) content: [T; LENGTH],
-    is_locked: bool,
+    inner: SecureBox<[T; LENGTH]>,
 }
 
 impl<T, const LENGTH: usize> SecureArray<T, LENGTH>
 where
     T: Copy + Zeroize,
 {
-    pub fn new(mut content: [T; LENGTH]) -> Self {
-        let is_locked = memlock::mlock(content.as_mut_ptr(), content.len());
-        Self { content, is_locked }
+    #[must_use]
+    pub fn new(content: [T; LENGTH]) -> Self {
+        Self {
+            inner: SecureBox::new(Box::new(content)),
+        }
     }
 
     /// Borrow the contents of the string.
+    #[must_use]
     pub fn unsecure(&self) -> &[T] {
         self.borrow()
     }
 
     /// Mutably borrow the contents of the string.
+    #[must_use]
     pub fn unsecure_mut(&mut self) -> &mut [T] {
         self.borrow_mut()
     }
@@ -49,13 +56,15 @@ where
     /// Overwrite the string with zeros. This is automatically called in the
     /// destructor.
     pub fn zero_out(&mut self) {
-        self.content.zeroize();
+        self.inner.unsecure_mut().zeroize();
     }
 }
 
 impl<T: Copy + Zeroize, const LENGTH: usize> Clone for SecureArray<T, LENGTH> {
     fn clone(&self) -> Self {
-        Self::new(self.content)
+        Self {
+            inner: self.inner.clone(),
+        }
     }
 }
 
@@ -63,7 +72,7 @@ impl<T: Copy + Zeroize + ConstantTimeEq, const LENGTH: usize> ConstantTimeEq
     for SecureArray<T, LENGTH>
 {
     fn ct_eq(&self, other: &Self) -> subtle::Choice {
-        self.content.as_slice().ct_eq(other.content.as_slice())
+        self.unsecure().ct_eq(other.unsecure())
     }
 }
 
@@ -118,7 +127,7 @@ where
     type Output = <[T; LENGTH] as std::ops::Index<U>>::Output;
 
     fn index(&self, index: U) -> &Self::Output {
-        std::ops::Index::index(&self.content, index)
+        std::ops::Index::index(self.inner.unsecure(), index)
     }
 }
 
@@ -128,7 +137,7 @@ where
     T: Copy + Zeroize,
 {
     fn borrow(&self) -> &[T] {
-        self.content.borrow()
+        self.inner.unsecure().as_slice()
     }
 }
 
@@ -137,20 +146,7 @@ where
     T: Copy + Zeroize,
 {
     fn borrow_mut(&mut self) -> &mut [T] {
-        self.content.borrow_mut()
-    }
-}
-
-// Overwrite memory with zeros when we're done
-impl<T, const LENGTH: usize> Drop for SecureArray<T, LENGTH>
-where
-    T: Copy + Zeroize,
-{
-    fn drop(&mut self) {
-        self.zero_out();
-        if self.is_locked {
-            memlock::munlock(self.content.as_mut_ptr(), self.content.len());
-        }
+        self.inner.unsecure_mut().as_mut_slice()
     }
 }
 
@@ -222,6 +218,18 @@ mod tests {
             format!("{}", SecureArray::<_, 5>::from_str("hello").unwrap()),
             "***SECRET***".to_string()
         );
+    }
+
+    #[test]
+    fn test_move_keeps_contents() {
+        // Regression guard for the move-after-mlock bug: moving the value must
+        // preserve the contents (data lives on the heap behind a SecureBox).
+        fn make() -> SecureArray<u8, 5> {
+            SecureArray::from_str("hello").unwrap()
+        }
+        let moved = make();
+        let v = vec![moved];
+        assert_eq!(v[0].unsecure(), b"hello");
     }
 
     #[test]

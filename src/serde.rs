@@ -96,7 +96,7 @@ impl<const LENGTH: usize> Serialize for SecureArray<u8, LENGTH> {
     where
         S: Serializer,
     {
-        serializer.serialize_bytes(self.content.borrow())
+        serializer.serialize_bytes(self.unsecure())
     }
 }
 
