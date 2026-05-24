@@ -19,6 +19,7 @@ impl SecureString {
     }
 
     /// Mutably borrow the contents of the string.
+    #[must_use]
     pub fn unsecure_mut(&mut self) -> &mut str {
         // SAFETY: Same as `unsecure` - contents are always valid UTF-8.
         unsafe { std::str::from_utf8_unchecked_mut(self.0.unsecure_mut()) }

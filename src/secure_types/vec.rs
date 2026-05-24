@@ -59,6 +59,7 @@ where
     }
 
     /// Mutably borrow the contents of the string.
+    #[must_use]
     pub fn unsecure_mut(&mut self) -> &mut [T] {
         self.borrow_mut()
     }

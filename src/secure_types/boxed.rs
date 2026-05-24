@@ -61,6 +61,7 @@ where
     /// # Panics
     ///
     /// Panics if the content has already been dropped.
+    #[must_use]
     pub fn unsecure_mut(&mut self) -> &mut T {
         self.content
             .as_deref_mut()
