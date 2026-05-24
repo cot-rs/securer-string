@@ -27,7 +27,9 @@ impl SecureString {
     /// Turn the string into a regular `String` again.
     #[must_use]
     pub fn into_unsecure(mut self) -> String {
-        memlock::munlock(self.0.content.as_mut_ptr(), self.0.content.capacity());
+        if self.0.is_locked {
+            memlock::munlock(self.0.content.as_mut_ptr(), self.0.content.capacity());
+        }
         let content = std::mem::take(&mut self.0.content);
         std::mem::forget(self);
         // SAFETY: Same as `unsecure` - contents are always valid UTF-8.

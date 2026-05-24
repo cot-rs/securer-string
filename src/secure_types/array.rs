@@ -24,6 +24,7 @@ where
     T: Copy + Zeroize,
 {
     pub(crate) content: [T; LENGTH],
+    is_locked: bool,
 }
 
 impl<T, const LENGTH: usize> SecureArray<T, LENGTH>
@@ -31,8 +32,8 @@ where
     T: Copy + Zeroize,
 {
     pub fn new(mut content: [T; LENGTH]) -> Self {
-        memlock::mlock(content.as_mut_ptr(), content.len());
-        Self { content }
+        let is_locked = memlock::mlock(content.as_mut_ptr(), content.len());
+        Self { content, is_locked }
     }
 
     /// Borrow the contents of the string.
@@ -147,7 +148,9 @@ where
 {
     fn drop(&mut self) {
         self.zero_out();
-        memlock::munlock(self.content.as_mut_ptr(), self.content.len());
+        if self.is_locked {
+            memlock::munlock(self.content.as_mut_ptr(), self.content.len());
+        }
     }
 }
 

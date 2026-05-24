@@ -31,6 +31,9 @@ where
     T: Copy + Zeroize,
 {
     pub(crate) content: Vec<T>,
+    /// Whether `content` is currently `mlock`ed. If `mlock` failed, `munlock`
+    /// must be skipped.
+    pub(crate) is_locked: bool,
 }
 
 /// Type alias for a vector that stores just bytes
@@ -42,8 +45,11 @@ where
 {
     #[must_use]
     pub fn new(mut cont: Vec<T>) -> Self {
-        memlock::mlock(cont.as_mut_ptr(), cont.capacity());
-        SecureVec { content: cont }
+        let is_locked = memlock::mlock(cont.as_mut_ptr(), cont.capacity());
+        SecureVec {
+            content: cont,
+            is_locked,
+        }
     }
 
     /// Borrow the contents of the string.
@@ -76,13 +82,16 @@ where
 
         // Allocate new vector, copy old data into it
         let mut new_vec = vec![value; new_len];
-        memlock::mlock(new_vec.as_mut_ptr(), new_vec.capacity());
+        let new_is_locked = memlock::mlock(new_vec.as_mut_ptr(), new_vec.capacity());
         new_vec[0..self.content.len()].copy_from_slice(&self.content);
 
         // Securely clear old vector, replace with new vector
         self.zero_out();
-        memlock::munlock(self.content.as_mut_ptr(), self.content.capacity());
+        if self.is_locked {
+            memlock::munlock(self.content.as_mut_ptr(), self.content.capacity());
+        }
         self.content = new_vec;
+        self.is_locked = new_is_locked;
     }
 
     /// Overwrite the string with zeros. This is automatically called in the
@@ -172,7 +181,9 @@ where
 {
     fn drop(&mut self) {
         self.zero_out();
-        memlock::munlock(self.content.as_mut_ptr(), self.content.capacity());
+        if self.is_locked {
+            memlock::munlock(self.content.as_mut_ptr(), self.content.capacity());
+        }
     }
 }
 

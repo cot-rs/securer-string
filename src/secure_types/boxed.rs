@@ -26,6 +26,9 @@ where
     // This is an `Option` to avoid UB in the destructor, outside the destructor, it is always
     // `Some(_)`
     content: Option<Box<T>>,
+    /// Whether `content` is currently `mlock`ed. If `mlock` failed, `munlock`
+    /// must be skipped.
+    is_locked: bool,
 }
 
 impl<T> SecureBox<T>
@@ -34,9 +37,10 @@ where
 {
     #[must_use]
     pub fn new(mut cont: Box<T>) -> Self {
-        memlock::mlock(&raw mut *cont, 1);
+        let is_locked = memlock::mlock(&raw mut *cont, 1);
         SecureBox {
             content: Some(cont),
+            is_locked,
         }
     }
 
@@ -141,7 +145,9 @@ where
             .zeroize();
         }
 
-        memlock::munlock(ptr, 1);
+        if self.is_locked {
+            memlock::munlock(ptr, 1);
+        }
 
         // Deallocate only non-zero-sized types, because otherwise it's UB
         if std::mem::size_of::<T>() != 0 {
