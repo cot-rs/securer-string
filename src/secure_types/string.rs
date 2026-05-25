@@ -19,6 +19,7 @@ impl SecureString {
     }
 
     /// Mutably borrow the contents of the string.
+    #[must_use]
     pub fn unsecure_mut(&mut self) -> &mut str {
         // SAFETY: Same as `unsecure` - contents are always valid UTF-8.
         unsafe { std::str::from_utf8_unchecked_mut(self.0.unsecure_mut()) }
@@ -27,7 +28,9 @@ impl SecureString {
     /// Turn the string into a regular `String` again.
     #[must_use]
     pub fn into_unsecure(mut self) -> String {
-        memlock::munlock(self.0.content.as_mut_ptr(), self.0.content.capacity());
+        if self.0.is_locked {
+            memlock::munlock(self.0.content.as_mut_ptr(), self.0.content.capacity());
+        }
         let content = std::mem::take(&mut self.0.content);
         std::mem::forget(self);
         // SAFETY: Same as `unsecure` - contents are always valid UTF-8.
@@ -98,7 +101,7 @@ impl<'de> serde::Deserialize<'de> for SecureString {
         D: serde::Deserializer<'de>,
     {
         struct SecureStringVisitor;
-        impl<'de> serde::de::Visitor<'de> for SecureStringVisitor {
+        impl serde::de::Visitor<'_> for SecureStringVisitor {
             type Value = SecureString;
             fn expecting(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 write!(formatter, "an utf-8 encoded string")

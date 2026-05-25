@@ -14,7 +14,7 @@ struct BytesVisitor<Value> {
 impl<Value> Default for BytesVisitor<Value> {
     fn default() -> Self {
         Self {
-            phandom_data: Default::default(),
+            phandom_data: PhantomData,
         }
     }
 }
@@ -33,10 +33,10 @@ where
     where
         E: de::Error,
     {
-        Self::Value::try_from(value.to_vec()).map_err(|error| {
-            serde::de::Error::custom(format!(
-                "cannot construct secure value from byte slice: {error}"
-            ))
+        Self::Value::try_from(value.to_vec()).map_err(|_| {
+            // Do not include the underlying error: some deserializers embed the
+            // (secret) input in their error messages.
+            serde::de::Error::custom("cannot construct secure value from byte slice")
         })
     }
 
@@ -44,10 +44,10 @@ where
     where
         E: de::Error,
     {
-        Self::Value::try_from(value).map_err(|error| {
-            serde::de::Error::custom(format!(
-                "cannot construct secure value from byte vector: {error}"
-            ))
+        Self::Value::try_from(value).map_err(|_| {
+            // Do not include the underlying error: some deserializers embed the
+            // (secret) input in their error messages.
+            serde::de::Error::custom("cannot construct secure value from byte vector")
         })
     }
 
@@ -61,10 +61,10 @@ where
             value.push(element);
         }
 
-        Self::Value::try_from(value).map_err(|error| {
-            serde::de::Error::custom(format!(
-                "cannot construct secure value from byte sequence: {error}"
-            ))
+        Self::Value::try_from(value).map_err(|_| {
+            // Do not include the underlying error: some deserializers embed the
+            // (secret) input in their error messages.
+            serde::de::Error::custom("cannot construct secure value from byte sequence")
         })
     }
 }
@@ -101,7 +101,7 @@ impl<const LENGTH: usize> Serialize for SecureArray<u8, LENGTH> {
     where
         S: Serializer,
     {
-        serializer.serialize_bytes(self.content.borrow())
+        serializer.serialize_bytes(self.unsecure())
     }
 }
 
