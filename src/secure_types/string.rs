@@ -101,7 +101,7 @@ impl<'de> serde::Deserialize<'de> for SecureString {
         D: serde::Deserializer<'de>,
     {
         struct SecureStringVisitor;
-        impl<'de> serde::de::Visitor<'de> for SecureStringVisitor {
+        impl serde::de::Visitor<'_> for SecureStringVisitor {
             type Value = SecureString;
             fn expecting(&self, formatter: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 write!(formatter, "an utf-8 encoded string")

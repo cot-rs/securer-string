@@ -14,7 +14,7 @@ struct BytesVisitor<Value> {
 impl<Value> Default for BytesVisitor<Value> {
     fn default() -> Self {
         Self {
-            phandom_data: Default::default(),
+            phandom_data: PhantomData,
         }
     }
 }

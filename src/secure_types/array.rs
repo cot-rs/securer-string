@@ -228,7 +228,7 @@ mod tests {
             SecureArray::from_str("hello").unwrap()
         }
         let moved = make();
-        let v = vec![moved];
+        let v = [moved];
         assert_eq!(v[0].unsecure(), b"hello");
     }
 
