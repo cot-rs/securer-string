@@ -44,8 +44,11 @@ where
     where
         E: de::Error,
     {
-        Self::Value::try_from(value)
-            .map_err(|_| serde::de::Error::custom("cannot construct secure value from byte vector"))
+        Self::Value::try_from(value).map_err(|_| {
+            // Do not include the underlying error: some deserializers embed the
+            // (secret) input in their error messages.
+            serde::de::Error::custom("cannot construct secure value from byte vector")
+        })
     }
 
     fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -59,6 +62,8 @@ where
         }
 
         Self::Value::try_from(value).map_err(|_| {
+            // Do not include the underlying error: some deserializers embed the
+            // (secret) input in their error messages.
             serde::de::Error::custom("cannot construct secure value from byte sequence")
         })
     }
