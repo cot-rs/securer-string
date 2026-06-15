@@ -37,7 +37,7 @@ where
 {
     #[must_use]
     pub fn new(mut cont: Box<T>) -> Self {
-        let is_locked = memlock::mlock(&raw mut *cont, 1);
+        let is_locked = memlock::mlock(&raw mut *cont, 1).is_ok();
         SecureBox {
             content: Some(cont),
             is_locked,

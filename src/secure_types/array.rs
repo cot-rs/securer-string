@@ -41,19 +41,19 @@ where
         }
     }
 
-    /// Borrow the contents of the string.
+    /// Borrow the contents of the array.
     #[must_use]
     pub fn unsecure(&self) -> &[T] {
         self.borrow()
     }
 
-    /// Mutably borrow the contents of the string.
+    /// Mutably borrow the contents of the array.
     #[must_use]
     pub fn unsecure_mut(&mut self) -> &mut [T] {
         self.borrow_mut()
     }
 
-    /// Overwrite the string with zeros. This is automatically called in the
+    /// Overwrite the array with zeros. This is automatically called in the
     /// destructor.
     pub fn zero_out(&mut self) {
         self.inner.unsecure_mut().zeroize();

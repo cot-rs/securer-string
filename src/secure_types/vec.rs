@@ -45,7 +45,7 @@ where
 {
     #[must_use]
     pub fn new(mut cont: Vec<T>) -> Self {
-        let is_locked = memlock::mlock(cont.as_mut_ptr(), cont.capacity());
+        let is_locked = memlock::mlock(cont.as_mut_ptr(), cont.capacity()).is_ok();
         SecureVec {
             content: cont,
             is_locked,
@@ -83,7 +83,7 @@ where
 
         // Allocate new vector, copy old data into it
         let mut new_vec = vec![value; new_len];
-        let new_is_locked = memlock::mlock(new_vec.as_mut_ptr(), new_vec.capacity());
+        let new_is_locked = memlock::mlock(new_vec.as_mut_ptr(), new_vec.capacity()).is_ok();
         new_vec[0..self.content.len()].copy_from_slice(&self.content);
 
         // Securely clear old vector, replace with new vector
