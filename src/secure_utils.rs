@@ -2,8 +2,13 @@
 pub mod memlock {
     extern crate libc;
 
+    /// Locks the given memory region into RAM.
+    ///
+    /// Returns `Ok(())` if the region was successfully locked. When `mlock`
+    /// fails the region is left unlocked and the matching [`munlock`] call must
+    /// be skipped, so callers should store whether the call succeeded.
     #[allow(unused_variables)]
-    pub fn mlock<T>(data: *mut T, count: usize) {
+    pub fn mlock<T>(data: *mut T, count: usize) -> Result<(), ()> {
         let byte_num = count * std::mem::size_of::<T>();
         // SAFETY: `cont` points to a valid allocation of at least `count *
         // size_of::<T>()` bytes (guaranteed by callers passing pointers from
@@ -12,12 +17,15 @@ pub mod memlock {
         #[cfg(not(miri))] // unsupported operation: can't call foreign function `mlock` on OS `linux
         unsafe {
             let ptr = data.cast::<libc::c_void>();
-            libc::mlock(ptr, byte_num);
+            if libc::mlock(ptr, byte_num) != 0 {
+                return Err(());
+            }
             #[cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
             libc::madvise(ptr, byte_num, libc::MADV_NOCORE);
             #[cfg(target_os = "linux")]
             libc::madvise(ptr, byte_num, libc::MADV_DONTDUMP);
         }
+        Ok(())
     }
 
     #[allow(unused_variables)]
@@ -40,7 +48,9 @@ pub mod memlock {
 
 #[cfg(not(unix))]
 pub mod memlock {
-    pub fn mlock<T>(_cont: *mut T, _count: usize) {}
+    pub fn mlock<T>(_cont: *mut T, _count: usize) -> Result<(), ()> {
+        Err(())
+    }
 
     pub fn munlock<T>(_cont: *mut T, _count: usize) {}
 }
